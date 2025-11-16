@@ -352,7 +352,7 @@ class CSVTransformer {
             { start: 'AS', end: 'BH' },
             { start: 'BJ', end: 'EG' },
             { start: 'EM', end: 'EQ' },
-            { start: 'ER', end: 'EX' },
+            { start: 'ET', end: 'EX' },
             { start: 'EZ', end: 'FC' },
             { start: 'FG', end: 'FJ' },
             { start: 'FL', end: 'GQ' },
