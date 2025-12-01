@@ -233,7 +233,7 @@ class CSVTransformer {
         const columnsToDelete = this.getColumnsToDelete(currentHeaders);
         const { headers: filteredHeaders, data: filteredData } = this.deleteColumns(currentHeaders, currentData, columnsToDelete);
         
-        // Step 2.5: Merge INPUT: First Name and INPUT: Last Name into Full Name
+        // Step 2.5: Merge INPUT: First Name and INPUT: Last Name into Debtor
         const inputFirstNameIndex = this.findColumnIndex(filteredHeaders, 'INPUT: First Name');
         const inputLastNameIndex = this.findColumnIndex(filteredHeaders, 'INPUT: Last Name');
         
@@ -251,9 +251,9 @@ class CSVTransformer {
                 return newRow;
             });
             
-            // Update headers - rename first name to "Full Name" and remove last name column
+            // Update headers - rename first name to "Debtor" and remove last name column
             mergedHeaders = filteredHeaders.map((header, index) => {
-                if (index === inputFirstNameIndex) return 'Full Name';
+                if (index === inputFirstNameIndex) return 'Debtor';
                 return header;
             }).filter((_, index) => index !== inputLastNameIndex);
             
