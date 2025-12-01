@@ -128,6 +128,34 @@
             opacity: 1;
         }
 
+        /* Special styling for Phone Database option */
+        .format-option.phone-database {
+            border-color: #10b981;
+            background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%);
+        }
+
+        .format-option.phone-database:hover {
+            border-color: #059669;
+            box-shadow: 0 10px 25px rgba(16, 185, 129, 0.2);
+        }
+
+        .format-option.phone-database.selected {
+            border-color: #059669;
+            background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%);
+        }
+
+        .format-option.phone-database h3 {
+            color: #059669;
+        }
+
+        .format-option.phone-database h3::before {
+            content: '📞 ';
+        }
+
+        .format-option.phone-database .icon {
+            color: #059669;
+        }
+
         .file-upload {
             background: #f8fafc;
             border: 2px dashed #cbd5e1;
@@ -244,6 +272,16 @@
             box-shadow: none;
         }
 
+        /* Phone Database Upload Button - Green */
+        .transform-btn.phone-upload {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: white;
+        }
+
+        .transform-btn.phone-upload:hover {
+            box-shadow: 0 10px 25px rgba(16, 185, 129, 0.3);
+        }
+
         .statistics-section {
             background: #f0f8ff;
             border: 1px solid #bfdbfe;
@@ -278,26 +316,37 @@
             padding: 15px;
             border-radius: 8px;
             text-align: center;
-            border: 1px solid #dbeafe;
         }
 
         .stat-number {
-            font-size: 1.8rem;
+            font-size: 2rem;
             font-weight: 700;
             color: #004aad;
-            margin-bottom: 5px;
         }
 
         .stat-label {
-            color: #1e40af;
+            color: #6b7280;
             font-size: 0.9rem;
-            font-weight: 500;
         }
 
         .stat-percentage {
-            color: #3b82f6;
             font-size: 0.8rem;
+            color: #22c55e;
             margin-top: 5px;
+        }
+
+        /* Phone Database Stats - Green theme */
+        .statistics-section.phone-stats {
+            background: #ecfdf5;
+            border-color: #a7f3d0;
+        }
+
+        .statistics-section.phone-stats h3 {
+            color: #059669;
+        }
+
+        .statistics-section.phone-stats .stat-number {
+            color: #059669;
         }
 
         .preview-section {
@@ -306,27 +355,25 @@
 
         .preview-section h2 {
             color: #004aad;
-            margin-bottom: 20px;
-            font-size: 1.5rem;
-        }
-
-        .preview-section h2::before {
-            content: '⚡ ';
+            margin-bottom: 15px;
         }
 
         .preview-tabs {
             display: flex;
             border-bottom: 2px solid #e5e7eb;
-            margin-bottom: 20px;
+            margin-bottom: 15px;
         }
 
         .preview-tab {
-            padding: 12px 24px;
+            padding: 10px 20px;
             cursor: pointer;
             border-bottom: 2px solid transparent;
+            margin-bottom: -2px;
             transition: all 0.3s ease;
-            color: #6b7280;
-            font-weight: 500;
+        }
+
+        .preview-tab:hover {
+            color: #004aad;
         }
 
         .preview-tab.active {
@@ -457,6 +504,20 @@
             display: block;
         }
 
+        .success-message {
+            background: #ecfdf5;
+            border: 1px solid #a7f3d0;
+            color: #059669;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: none;
+        }
+
+        .success-message.show {
+            display: block;
+        }
+
         .footer {
             background: linear-gradient(135deg, #004aad 0%, #003d8f 100%);
             color: white;
@@ -468,6 +529,118 @@
 
         .footer::before {
             content: '⚡ ';
+        }
+
+        /* Password Modal */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal-overlay.show {
+            display: flex;
+        }
+
+        .modal {
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            max-width: 400px;
+            width: 90%;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
+        }
+
+        .modal h3 {
+            color: #059669;
+            margin-bottom: 20px;
+            font-size: 1.3rem;
+        }
+
+        .modal h3::before {
+            content: '🔐 ';
+        }
+
+        .modal input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e5e7eb;
+            border-radius: 8px;
+            font-size: 1rem;
+            margin-bottom: 20px;
+        }
+
+        .modal input:focus {
+            outline: none;
+            border-color: #059669;
+        }
+
+        .modal-buttons {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+        }
+
+        .modal-btn {
+            padding: 10px 20px;
+            border-radius: 8px;
+            border: none;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+
+        .modal-btn.cancel {
+            background: #e5e7eb;
+            color: #374151;
+        }
+
+        .modal-btn.confirm {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: white;
+        }
+
+        .modal-btn:hover {
+            transform: translateY(-2px);
+        }
+
+        /* Progress bar for upload */
+        .progress-container {
+            display: none;
+            margin: 20px 0;
+        }
+
+        .progress-container.show {
+            display: block;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 20px;
+            background: #e5e7eb;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+
+        .progress-text {
+            text-align: center;
+            margin-top: 10px;
+            color: #059669;
+            font-weight: 600;
         }
 
         @media (max-width: 768px) {
@@ -525,6 +698,11 @@
                         <h3>IMPORT NEW</h3>
                         <p>Format new data imports with validation and standardization</p>
                     </div>
+                    <div class="format-option phone-database" data-format="phonedb">
+                        <div class="icon"><i class="fas fa-check-circle"></i></div>
+                        <h3>PHONE DATABASE</h3>
+                        <p>Upload cleaned batch data to MongoDB for phone number lookups by agents</p>
+                    </div>
                 </div>
             </div>
 
@@ -546,10 +724,18 @@
             </div>
 
             <div class="error-message" id="errorMessage"></div>
+            <div class="success-message" id="successMessage"></div>
 
             <button class="transform-btn" id="transformBtn" disabled>
                 Transform File
             </button>
+
+            <div class="progress-container" id="progressContainer">
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progressFill"></div>
+                </div>
+                <div class="progress-text" id="progressText">Uploading... 0%</div>
+            </div>
 
             <div class="loading" id="loading">
                 <div class="spinner"></div>
@@ -606,6 +792,18 @@
         </div>
     </div>
 
+    <!-- Password Modal for Phone Database -->
+    <div class="modal-overlay" id="passwordModal">
+        <div class="modal">
+            <h3>Enter Upload Password</h3>
+            <input type="password" id="uploadPassword" placeholder="Enter password to upload">
+            <div class="modal-buttons">
+                <button class="modal-btn cancel" id="cancelUpload">Cancel</button>
+                <button class="modal-btn confirm" id="confirmUpload">Upload</button>
+            </div>
+        </div>
+    </div>
+
     <script src="script.js"></script>
 </body>
-</html> 
+</html>
