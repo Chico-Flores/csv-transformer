@@ -172,6 +172,12 @@ class CSVTransformer {
             return;
         }
 
+        // Handle phone database upload separately
+        if (this.selectedFormat === 'phonedb') {
+            await this.uploadToPhoneDatabase();
+            return;
+        }
+
         this.showLoading(true);
         
         try {
@@ -707,6 +713,314 @@ class CSVTransformer {
 
     validateRow(row) {
         return row.slice(0, 7).some(field => field && field.trim() !== '');
+    }
+
+    cleanPhone(phone) {
+        if (!phone || typeof phone !== 'string') return null;
+        // Remove all non-digits
+        const digits = phone.replace(/\D/g, '');
+        // Take last 10 digits
+        const cleanedPhone = digits.slice(-10);
+        // Return null if not exactly 10 digits
+        return cleanedPhone.length === 10 ? cleanedPhone : null;
+    }
+
+    transformToPhoneRecords() {
+        const { headers, data } = this.originalData;
+        const phoneRecords = [];
+
+        // Find column indices by header name
+        const debtorIdx = this.findColumnIndex(headers, 'Debtor');
+        const phone1Idx = this.findColumnIndex(headers, 'PH: Phone1');
+        const phone2Idx = this.findColumnIndex(headers, 'PH: Phone2');
+        const phone3Idx = this.findColumnIndex(headers, 'PH: Phone3');
+        const phone4Idx = this.findColumnIndex(headers, 'PH: Phone4');
+        const phone5Idx = this.findColumnIndex(headers, 'PH: Phone5');
+        const addressIdx = this.findColumnIndex(headers, 'ADD: Address1');
+        const cityIdx = this.findColumnIndex(headers, 'ADD: City');
+        const stateIdx = this.findColumnIndex(headers, 'ADD: State');
+        const zipIdx = this.findColumnIndex(headers, 'ADD: Zip');
+        const countyIdx = this.findColumnIndex(headers, 'ADD: County');
+
+        // Relative column mappings
+        const relatives = [
+            {
+                name: 'REL1: Full Name',
+                address: 'REL1: Address',
+                city: 'REL1: City',
+                state: 'REL1: State',
+                zip: 'REL1: Zip',
+                phone1: 'REL1: Phone 1',
+                phone2: 'REL1: Phone 2'
+            },
+            {
+                name: 'REL2: Full Name',
+                address: 'REL2: Address',
+                city: 'REL2: City',
+                state: 'REL2: State',
+                zip: 'REL2: Zip',
+                phone1: 'REL2: Phone 1',
+                phone2: 'REL2: Phone 2'
+            },
+            {
+                name: 'REL3: Full Name',
+                address: 'REL3: Address',
+                city: 'REL3: City',
+                state: 'REL3: State',
+                zip: 'REL3: Zip',
+                phone1: 'REL3: Phone 1',
+                phone2: 'REL3: Phone 2'
+            },
+            {
+                name: 'REL4: Full Name',
+                address: 'REL4: Address',
+                city: 'REL4: City',
+                state: 'REL4: State',
+                zip: 'REL4: Zip',
+                phone1: 'REL4: Phone 1',
+                phone2: 'REL4: Phone 2'
+            },
+            {
+                name: 'REL5: Full Name',
+                address: 'REL5: Address',
+                city: 'REL5: City',
+                state: 'REL5: State',
+                zip: 'REL5: Zip',
+                phone1: 'REL5: Phone 1',
+                phone2: 'REL5: Phone 2'
+            },
+            {
+                name: 'REL6: Full Name',
+                address: 'REL6: Address',
+                city: 'REL6: City',
+                state: 'REL6: State',
+                zip: 'REL6: Zip',
+                phone1: 'REL6: Phone 1',
+                phone2: 'REL6: Phone 2'
+            }
+        ];
+
+        // Process each row
+        data.forEach(row => {
+            // Extract debtor information
+            const debtorName = row[debtorIdx] || '';
+            
+            if (!debtorName.trim()) {
+                return; // Skip rows without a debtor name
+            }
+
+            const debtorPerson = {
+                name: debtorName,
+                type: 'DEBTOR',
+                address: row[addressIdx] || '',
+                city: row[cityIdx] || '',
+                state: row[stateIdx] || '',
+                zip: row[zipIdx] || '',
+                county: row[countyIdx] || ''
+            };
+
+            // Process debtor phones (5 phones)
+            const debtorPhoneIndices = [phone1Idx, phone2Idx, phone3Idx, phone4Idx, phone5Idx];
+            debtorPhoneIndices.forEach(idx => {
+                if (idx !== -1) {
+                    const cleanedPhone = this.cleanPhone(row[idx]);
+                    if (cleanedPhone) {
+                        phoneRecords.push({
+                            phone: cleanedPhone,
+                            person: debtorPerson
+                        });
+                    }
+                }
+            });
+
+            // Process relatives
+            relatives.forEach(rel => {
+                const nameIdx = this.findColumnIndex(headers, rel.name);
+                const addrIdx = this.findColumnIndex(headers, rel.address);
+                const cityIdx = this.findColumnIndex(headers, rel.city);
+                const stateIdx = this.findColumnIndex(headers, rel.state);
+                const zipIdx = this.findColumnIndex(headers, rel.zip);
+                const phone1Idx = this.findColumnIndex(headers, rel.phone1);
+                const phone2Idx = this.findColumnIndex(headers, rel.phone2);
+
+                const relativeName = nameIdx !== -1 ? row[nameIdx] : '';
+
+                if (relativeName && relativeName.trim()) {
+                    const relativePerson = {
+                        name: relativeName,
+                        type: 'RELATIVE',
+                        address: addrIdx !== -1 ? row[addrIdx] || '' : '',
+                        city: cityIdx !== -1 ? row[cityIdx] || '' : '',
+                        state: stateIdx !== -1 ? row[stateIdx] || '' : '',
+                        zip: zipIdx !== -1 ? row[zipIdx] || '' : '',
+                        county: null
+                    };
+
+                    // Process relative phones (2 phones)
+                    [phone1Idx, phone2Idx].forEach(idx => {
+                        if (idx !== -1) {
+                            const cleanedPhone = this.cleanPhone(row[idx]);
+                            if (cleanedPhone) {
+                                phoneRecords.push({
+                                    phone: cleanedPhone,
+                                    person: relativePerson
+                                });
+                            }
+                        }
+                    });
+                }
+            });
+        });
+
+        return phoneRecords;
+    }
+
+    async uploadToPhoneDatabase() {
+        try {
+            // Transform CSV to phone records
+            const phoneRecords = this.transformToPhoneRecords();
+            
+            if (phoneRecords.length === 0) {
+                this.showError('No valid phone records found in the CSV file.');
+                return;
+            }
+
+            const BATCH_SIZE = 500;
+            const PASSWORD = 'Letmein01';
+            const API_ENDPOINT = 'https://phg-phone-api.vercel.app/api/upload';
+
+            // Show progress modal
+            this.showUploadProgress(true);
+
+            // Statistics tracking
+            let totalInserted = 0;
+            let totalUpdated = 0;
+            let totalErrors = 0;
+            let totalInDatabase = 0;
+
+            // Calculate total batches
+            const totalBatches = Math.ceil(phoneRecords.length / BATCH_SIZE);
+
+            // Upload in batches
+            for (let i = 0; i < phoneRecords.length; i += BATCH_SIZE) {
+                const batch = phoneRecords.slice(i, i + BATCH_SIZE);
+                const currentBatch = Math.floor(i / BATCH_SIZE) + 1;
+
+                // Update progress
+                const progress = (i / phoneRecords.length) * 100;
+                this.updateUploadProgress(
+                    progress,
+                    `Uploading batch ${currentBatch} of ${totalBatches}... (${i} of ${phoneRecords.length} records)`
+                );
+
+                try {
+                    const response = await fetch(API_ENDPOINT, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            password: PASSWORD,
+                            phoneRecords: batch
+                        })
+                    });
+
+                    const result = await response.json();
+
+                    if (!response.ok || !result.success) {
+                        throw new Error(result.error || 'Upload failed');
+                    }
+
+                    // Accumulate statistics
+                    totalInserted += result.statistics.inserted || 0;
+                    totalUpdated += result.statistics.updated || 0;
+                    totalErrors += result.statistics.errors || 0;
+                    totalInDatabase = result.statistics.totalInDatabase || 0;
+
+                } catch (error) {
+                    console.error('Batch upload error:', error);
+                    totalErrors += batch.length;
+                }
+            }
+
+            // Update progress to 100%
+            this.updateUploadProgress(100, 'Upload complete!');
+
+            // Wait a moment before hiding progress modal
+            await new Promise(resolve => setTimeout(resolve, 500));
+
+            // Hide progress modal
+            this.showUploadProgress(false);
+
+            // Show statistics
+            this.showPhoneDbStatistics({
+                totalProcessed: phoneRecords.length,
+                inserted: totalInserted,
+                updated: totalUpdated,
+                errors: totalErrors,
+                totalInDatabase: totalInDatabase
+            });
+
+            this.hideError();
+
+        } catch (error) {
+            this.showUploadProgress(false);
+            this.showError('Error uploading to phone database: ' + error.message);
+        }
+    }
+
+    showUploadProgress(show) {
+        const modal = document.getElementById('uploadProgressModal');
+        if (show) {
+            modal.classList.add('show');
+        } else {
+            modal.classList.remove('show');
+        }
+    }
+
+    updateUploadProgress(percentage, message) {
+        const progressBar = document.getElementById('uploadProgressBar');
+        const progressText = document.getElementById('uploadProgressText');
+        
+        progressBar.style.width = percentage + '%';
+        progressText.textContent = message;
+    }
+
+    showPhoneDbStatistics(stats) {
+        const statisticsSection = document.getElementById('phoneDbStatisticsSection');
+        const statisticsGrid = document.getElementById('phoneDbStatisticsGrid');
+
+        const insertedPercentage = ((stats.inserted / stats.totalProcessed) * 100).toFixed(1);
+        const updatedPercentage = ((stats.updated / stats.totalProcessed) * 100).toFixed(1);
+        const errorsPercentage = ((stats.errors / stats.totalProcessed) * 100).toFixed(1);
+
+        statisticsGrid.innerHTML = `
+            <div class="stat-item">
+                <div class="stat-number">${stats.totalProcessed}</div>
+                <div class="stat-label">Total Records Processed</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-number">${stats.inserted}</div>
+                <div class="stat-label">New Phones Inserted</div>
+                <div class="stat-percentage">${insertedPercentage}%</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-number">${stats.updated}</div>
+                <div class="stat-label">Existing Phones Updated</div>
+                <div class="stat-percentage">${updatedPercentage}%</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-number">${stats.errors}</div>
+                <div class="stat-label">Errors Encountered</div>
+                <div class="stat-percentage">${errorsPercentage}%</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-number">${stats.totalInDatabase}</div>
+                <div class="stat-label">Total Phones in Database</div>
+            </div>
+        `;
+
+        statisticsSection.classList.add('show');
     }
 
     showStatistics() {
