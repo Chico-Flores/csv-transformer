@@ -220,14 +220,14 @@ class CSVTransformer {
     applyReturnedBatchTransformation() {
         const { headers, data } = this.originalData;
         
-        // Step 1: Delete columns after MQ (keep MQ column)
-        const mqIndex = this.findColumnIndex(headers, 'REL6: Phone 2');
-        if (mqIndex === -1) {
-            throw new Error('Could not find MQ column [REL6: Phone 2]');
+        // Step 1: Delete columns after REL6: Phone 2 (keep REL6: Phone 2 column)
+        const rel6Phone2Index = this.findColumnIndex(headers, 'REL6: Phone 2');
+        if (rel6Phone2Index === -1) {
+            throw new Error('Could not find REL6: Phone 2 column');
         }
         
-        let currentHeaders = headers.slice(0, mqIndex + 1);
-        let currentData = data.map(row => row.slice(0, mqIndex + 1));
+        let currentHeaders = headers.slice(0, rel6Phone2Index + 1);
+        let currentData = data.map(row => row.slice(0, rel6Phone2Index + 1));
         
         // Step 2: Delete unnecessary columns
         const columnsToDelete = this.getColumnsToDelete(currentHeaders);
@@ -358,8 +358,8 @@ class CSVTransformer {
             { start: 'LH', end: 'LI' },  // Rel 4: Phone 1 & Phone 2 (skip age at LG)
             { start: 'LS', end: 'LW' },  // Rel 5: Full Name through Zip
             { start: 'LY', end: 'LZ' },  // Rel 5: Phone 1 & Phone 2 (skip age at LX)
-            { start: 'MF', end: 'MJ' },  // Rel 6: Full Name through Zip
-            { start: 'ML', end: 'MM' }   // Rel 6: Phone 1 & Phone 2 (skip age at MK)
+            { start: 'MF', end: 'MN' },  // Rel 6: Full Name through Zip (MF-MN as specified)
+            { start: 'MP', end: 'MQ' }   // Rel 6: Phone 1 & Phone 2 (skip age at MO)
         ];
         
         // Range columns to delete (modified to exclude relative columns)
@@ -395,10 +395,10 @@ class CSVTransformer {
             { start: 'LX', end: 'LX' },  // Delete LX (Rel 5 Age)
             // LY-LZ are kept (Rel 5: Phone 1 & Phone 2)
             { start: 'MA', end: 'ME' },  // Delete Phone 3+, stops before MF
-            // MF-MJ are kept (Rel 6: Full Name through Zip)
-            { start: 'MK', end: 'MK' },  // Delete MK (Rel 6 Age)
-            // ML-MM are kept (Rel 6: Phone 1 & Phone 2)
-            { start: 'MN', end: 'MQ' }   // Delete Phone 3+ through end (MQ = REL6: Phone 2 is the last column kept initially)
+            // MF-MN are kept (Rel 6: Full Name through Zip)
+            { start: 'MO', end: 'MO' },  // Delete MO (Rel 6 Age)
+            // MP-MQ are kept (Rel 6: Phone 1 & Phone 2)
+            { start: 'MR', end: 'MR' }   // Delete MR and beyond (Rel 6: Phone 3+)
         ];
         
         // Convert column letters to indices
