@@ -936,4 +936,4 @@ class CSVTransformer {
 // Initialize the application when the page loads
 document.addEventListener('DOMContentLoaded', () => {
     new CSVTransformer();
-});
+}); 
