@@ -348,12 +348,18 @@ class CSVTransformer {
         
         // Columns to keep (relative information)
         const columnsToKeep = [
-            { start: 'JC', end: 'JI' },  // Rel 1: Full Name through Zip + Phone 1 & 2
-            { start: 'JT', end: 'KA' },  // Rel 2: Full Name through Zip + Phone 1 & 2
-            { start: 'KK', end: 'KR' },  // Rel 3: Full Name through Zip + Phone 1 & 2
-            { start: 'LB', end: 'LI' },  // Rel 4: Full Name through Zip + Phone 1 & 2
-            { start: 'LS', end: 'LZ' },  // Rel 5: Full Name through Zip + Phone 1 & 2
-            { start: 'MF', end: 'MM' }   // Rel 6: Full Name through Zip + Phone 1 & 2
+            { start: 'JC', end: 'JG' },  // Rel 1: Full Name through Zip
+            { start: 'JI', end: 'JJ' },  // Rel 1: Phone 1 & Phone 2 (skip age at JH)
+            { start: 'JT', end: 'JX' },  // Rel 2: Full Name through Zip
+            { start: 'JZ', end: 'KA' },  // Rel 2: Phone 1 & Phone 2 (skip age at JY)
+            { start: 'KK', end: 'KO' },  // Rel 3: Full Name through Zip
+            { start: 'KQ', end: 'KR' },  // Rel 3: Phone 1 & Phone 2 (skip age at KP)
+            { start: 'LB', end: 'LF' },  // Rel 4: Full Name through Zip
+            { start: 'LH', end: 'LI' },  // Rel 4: Phone 1 & Phone 2 (skip age at LG)
+            { start: 'LS', end: 'LW' },  // Rel 5: Full Name through Zip
+            { start: 'LY', end: 'LZ' },  // Rel 5: Phone 1 & Phone 2 (skip age at LX)
+            { start: 'MF', end: 'MJ' },  // Rel 6: Full Name through Zip
+            { start: 'ML', end: 'MM' }   // Rel 6: Phone 1 & Phone 2 (skip age at MK)
         ];
         
         // Range columns to delete (modified to exclude relative columns)
@@ -368,19 +374,31 @@ class CSVTransformer {
             { start: 'FL', end: 'GQ' },
             { start: 'GT', end: 'GV' },
             { start: 'GY', end: 'HA' },
-            { start: 'HE', end: 'JB' },  // Split: was HE-JH, now stops before JC
-            // JC-JI are kept (Rel 1: Full Name through Phone 2)
-            { start: 'JJ', end: 'JS' },  // Split: continues after JI (skip Phone 3+), stops before JT
-            // JT-KA are kept (Rel 2: Full Name through Phone 2)
-            { start: 'KB', end: 'KJ' },  // Split: continues after KA (skip Phone 3+), stops before KK
-            // KK-KR are kept (Rel 3: Full Name through Phone 2)
-            { start: 'KS', end: 'LA' },  // Split: continues after KR (skip Phone 3+), stops before LB
-            // LB-LI are kept (Rel 4: Full Name through Phone 2)
-            { start: 'LJ', end: 'LR' },  // Split: continues after LI (skip Phone 3+), stops before LS
-            // LS-LZ are kept (Rel 5: Full Name through Phone 2)
-            { start: 'MA', end: 'ME' },  // Split: continues after LZ (skip Phone 3+), stops before MF
-            // MF-MM are kept (Rel 6: Full Name through Phone 2)
-            { start: 'MN', end: 'MQ' }   // Split: continues after MM (skip Phone 3+), goes to end (MQ)
+            { start: 'HE', end: 'JB' },  // Split: stops before JC (Rel 1 Full Name)
+            // JC-JG are kept (Rel 1: Full Name through Zip)
+            { start: 'JH', end: 'JH' },  // Delete JH (Rel 1 Age)
+            // JI-JJ are kept (Rel 1: Phone 1 & Phone 2)
+            { start: 'JK', end: 'JS' },  // Delete Phone 3+, stops before JT
+            // JT-JX are kept (Rel 2: Full Name through Zip)
+            { start: 'JY', end: 'JY' },  // Delete JY (Rel 2 Age)
+            // JZ-KA are kept (Rel 2: Phone 1 & Phone 2)
+            { start: 'KB', end: 'KJ' },  // Delete Phone 3+, stops before KK
+            // KK-KO are kept (Rel 3: Full Name through Zip)
+            { start: 'KP', end: 'KP' },  // Delete KP (Rel 3 Age)
+            // KQ-KR are kept (Rel 3: Phone 1 & Phone 2)
+            { start: 'KS', end: 'LA' },  // Delete Phone 3+, stops before LB
+            // LB-LF are kept (Rel 4: Full Name through Zip)
+            { start: 'LG', end: 'LG' },  // Delete LG (Rel 4 Age)
+            // LH-LI are kept (Rel 4: Phone 1 & Phone 2)
+            { start: 'LJ', end: 'LR' },  // Delete Phone 3+, stops before LS
+            // LS-LW are kept (Rel 5: Full Name through Zip)
+            { start: 'LX', end: 'LX' },  // Delete LX (Rel 5 Age)
+            // LY-LZ are kept (Rel 5: Phone 1 & Phone 2)
+            { start: 'MA', end: 'ME' },  // Delete Phone 3+, stops before MF
+            // MF-MJ are kept (Rel 6: Full Name through Zip)
+            { start: 'MK', end: 'MK' },  // Delete MK (Rel 6 Age)
+            // ML-MM are kept (Rel 6: Phone 1 & Phone 2)
+            { start: 'MN', end: 'MQ' }   // Delete Phone 3+ through end (MQ = REL6: Phone 2 is the last column kept initially)
         ];
         
         // Convert column letters to indices
