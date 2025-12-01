@@ -358,7 +358,7 @@ class CSVTransformer {
             { start: 'LH', end: 'LI' },  // Rel 4: Phone 1 & Phone 2 (skip age at LG)
             { start: 'LS', end: 'LW' },  // Rel 5: Full Name through Zip
             { start: 'LY', end: 'LZ' },  // Rel 5: Phone 1 & Phone 2 (skip age at LX)
-            { start: 'MF', end: 'MN' },  // Rel 6: Full Name through Zip (MF-MN as specified)
+            { start: 'MJ', end: 'MN' },  // Rel 6: Full Name through Zip (skip First/Middle/Last/Suffix at MF-MI)
             { start: 'MP', end: 'MQ' }   // Rel 6: Phone 1 & Phone 2 (skip age at MO)
         ];
         
@@ -394,8 +394,8 @@ class CSVTransformer {
             // LS-LW are kept (Rel 5: Full Name through Zip)
             { start: 'LX', end: 'LX' },  // Delete LX (Rel 5 Age)
             // LY-LZ are kept (Rel 5: Phone 1 & Phone 2)
-            { start: 'MA', end: 'ME' },  // Delete Phone 3+, stops before MF
-            // MF-MN are kept (Rel 6: Full Name through Zip)
+            { start: 'MA', end: 'MI' },  // Delete Phone 3+ and Rel6 individual name columns (First/Middle/Last/Suffix)
+            // MJ-MN are kept (Rel 6: Full Name through Zip)
             { start: 'MO', end: 'MO' },  // Delete MO (Rel 6 Age)
             // MP-MQ are kept (Rel 6: Phone 1 & Phone 2)
             { start: 'MR', end: 'MR' }   // Delete MR and beyond (Rel 6: Phone 3+)
