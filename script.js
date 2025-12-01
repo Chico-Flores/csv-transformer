@@ -233,19 +233,49 @@ class CSVTransformer {
         const columnsToDelete = this.getColumnsToDelete(currentHeaders);
         const { headers: filteredHeaders, data: filteredData } = this.deleteColumns(currentHeaders, currentData, columnsToDelete);
         
+        // Step 2.5: Merge INPUT: First Name and INPUT: Last Name into Full Name
+        const inputFirstNameIndex = this.findColumnIndex(filteredHeaders, 'INPUT: First Name');
+        const inputLastNameIndex = this.findColumnIndex(filteredHeaders, 'INPUT: Last Name');
+        
+        let mergedHeaders = filteredHeaders;
+        let mergedData = filteredData;
+        
+        if (inputFirstNameIndex !== -1 && inputLastNameIndex !== -1) {
+            // Merge the data
+            mergedData = filteredData.map(row => {
+                const newRow = [...row];
+                const firstName = row[inputFirstNameIndex] || '';
+                const lastName = row[inputLastNameIndex] || '';
+                const fullName = [firstName, lastName].filter(n => n).join(' ');
+                newRow[inputFirstNameIndex] = fullName;
+                return newRow;
+            });
+            
+            // Update headers - rename first name to "Full Name" and remove last name column
+            mergedHeaders = filteredHeaders.map((header, index) => {
+                if (index === inputFirstNameIndex) return 'Full Name';
+                return header;
+            }).filter((_, index) => index !== inputLastNameIndex);
+            
+            // Remove last name column from data
+            mergedData = mergedData.map(row => 
+                row.filter((_, index) => index !== inputLastNameIndex)
+            );
+        }
+        
         // Step 3: Process deceased records
-        const deceasedIndex = this.findColumnIndex(filteredHeaders, 'DEC: Deceased (Y/N/U)');
-        const ssnIndex = this.findColumnIndex(filteredHeaders, 'INPUT: SSN');
+        const deceasedIndex = this.findColumnIndex(mergedHeaders, 'DEC: Deceased (Y/N/U)');
+        const ssnIndex = this.findColumnIndex(mergedHeaders, 'INPUT: SSN');
         
         if (deceasedIndex === -1 || ssnIndex === -1) {
             throw new Error('Could not find required columns for deceased processing');
         }
         
-        const deceasedRows = filteredData.filter(row => row[deceasedIndex] === 'Y');
-        const nonDeceasedData = filteredData.filter(row => row[deceasedIndex] !== 'Y');
+        const deceasedRows = mergedData.filter(row => row[deceasedIndex] === 'Y');
+        const nonDeceasedData = mergedData.filter(row => row[deceasedIndex] !== 'Y');
         
         // Step 4: Process bankruptcy records
-        const bankruptcyIndex = this.findColumnIndex(filteredHeaders, 'BNK: Bankrupt (Y/N/U)');
+        const bankruptcyIndex = this.findColumnIndex(mergedHeaders, 'BNK: Bankrupt (Y/N/U)');
         
         if (bankruptcyIndex === -1) {
             throw new Error('Could not find bankruptcy column');
@@ -264,7 +294,7 @@ class CSVTransformer {
         });
         
         // Remove deceased and bankruptcy columns from clean data
-        const finalHeaders = filteredHeaders.filter((_, index) => index !== deceasedIndex && index !== bankruptcyIndex);
+        const finalHeaders = mergedHeaders.filter((_, index) => index !== deceasedIndex && index !== bankruptcyIndex);
         const finalData = cleanData.map(row => 
             row.filter((_, index) => index !== deceasedIndex && index !== bankruptcyIndex)
         );
@@ -343,8 +373,8 @@ class CSVTransformer {
     getColumnsToDelete(headers) {
         const columnsToDelete = [];
         
-        // Single columns to delete
-        const singleColumns = ['A', 'B', 'D', 'E', 'F', 'G', 'H', 'J', 'L', 'M', 'N', 'P', 'Q', 'R', 'T', 'U', 'V', 'X', 'Y', 'AA', 'AB', 'AD', 'AE'];
+        // Single columns to delete (removed A and B - we'll merge them later)
+        const singleColumns = ['D', 'E', 'F', 'G', 'H', 'J', 'L', 'M', 'N', 'P', 'Q', 'R', 'T', 'U', 'V', 'X', 'Y', 'AA', 'AB', 'AD', 'AE'];
         
         // Columns to keep (relative information)
         const columnsToKeep = [
