@@ -346,7 +346,17 @@ class CSVTransformer {
         // Single columns to delete
         const singleColumns = ['A', 'B', 'D', 'E', 'F', 'G', 'H', 'J', 'L', 'M', 'N', 'P', 'Q', 'R', 'T', 'U', 'V', 'X', 'Y', 'AA', 'AB', 'AD', 'AE'];
         
-        // Range columns to delete
+        // Columns to keep (relative information)
+        const columnsToKeep = [
+            { start: 'JC', end: 'JG' },  // Rel 1: Full Name through Zip
+            { start: 'JT', end: 'JX' },  // Rel 2: Full Name through Zip
+            { start: 'KK', end: 'KO' },  // Rel 3: Full Name through Zip
+            { start: 'LB', end: 'LF' },  // Rel 4: Full Name through Zip
+            { start: 'LS', end: 'LW' },  // Rel 5: Full Name through Zip
+            { start: 'MF', end: 'MN' }   // Rel 6: Full Name through Zip
+        ];
+        
+        // Range columns to delete (modified to exclude relative columns)
         const rangeColumns = [
             { start: 'AG', end: 'AQ' },
             { start: 'AS', end: 'BH' },
@@ -358,12 +368,23 @@ class CSVTransformer {
             { start: 'FL', end: 'GQ' },
             { start: 'GT', end: 'GV' },
             { start: 'GY', end: 'HA' },
-            { start: 'HE', end: 'JH' },
-            { start: 'JL', end: 'JY' },
-            { start: 'KC', end: 'KP' },
-            { start: 'KS', end: 'LG' },
-            { start: 'LJ', end: 'LX' },
-            { start: 'MA', end: 'MO' }
+            { start: 'HE', end: 'JB' },  // Split: was HE-JH, now stops before JC
+            // JC-JG are kept (Rel 1)
+            { start: 'JH', end: 'JS' },  // Split: continues after JG, stops before JT
+            // JT-JX are kept (Rel 2)
+            { start: 'JY', end: 'JY' },  // Split: single column after JX
+            { start: 'KC', end: 'KJ' },  // Split: was KC-KP, now stops before KK
+            // KK-KO are kept (Rel 3)
+            { start: 'KP', end: 'KP' },  // Split: single column after KO
+            { start: 'KS', end: 'LA' },  // Split: was KS-LG, now stops before LB
+            // LB-LF are kept (Rel 4)
+            { start: 'LG', end: 'LG' },  // Split: single column after LF
+            { start: 'LJ', end: 'LR' },  // Split: was LJ-LX, now stops before LS
+            // LS-LW are kept (Rel 5)
+            { start: 'LX', end: 'LX' },  // Split: single column after LW
+            { start: 'MA', end: 'ME' },  // Split: was MA-MO, now stops before MF
+            // MF-MN are kept (Rel 6)
+            { start: 'MO', end: 'MO' }   // Split: single column after MN
         ];
         
         // Convert column letters to indices
