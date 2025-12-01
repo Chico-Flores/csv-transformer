@@ -348,12 +348,12 @@ class CSVTransformer {
         
         // Columns to keep (relative information)
         const columnsToKeep = [
-            { start: 'JC', end: 'JG' },  // Rel 1: Full Name through Zip
-            { start: 'JT', end: 'JX' },  // Rel 2: Full Name through Zip
-            { start: 'KK', end: 'KO' },  // Rel 3: Full Name through Zip
-            { start: 'LB', end: 'LF' },  // Rel 4: Full Name through Zip
-            { start: 'LS', end: 'LW' },  // Rel 5: Full Name through Zip
-            { start: 'MF', end: 'MN' }   // Rel 6: Full Name through Zip
+            { start: 'JC', end: 'JI' },  // Rel 1: Full Name through Zip + Phone 1 & 2
+            { start: 'JT', end: 'KA' },  // Rel 2: Full Name through Zip + Phone 1 & 2
+            { start: 'KK', end: 'KR' },  // Rel 3: Full Name through Zip + Phone 1 & 2
+            { start: 'LB', end: 'LI' },  // Rel 4: Full Name through Zip + Phone 1 & 2
+            { start: 'LS', end: 'LZ' },  // Rel 5: Full Name through Zip + Phone 1 & 2
+            { start: 'MF', end: 'MM' }   // Rel 6: Full Name through Zip + Phone 1 & 2
         ];
         
         // Range columns to delete (modified to exclude relative columns)
@@ -369,22 +369,18 @@ class CSVTransformer {
             { start: 'GT', end: 'GV' },
             { start: 'GY', end: 'HA' },
             { start: 'HE', end: 'JB' },  // Split: was HE-JH, now stops before JC
-            // JC-JG are kept (Rel 1)
-            { start: 'JH', end: 'JS' },  // Split: continues after JG, stops before JT
-            // JT-JX are kept (Rel 2)
-            { start: 'JY', end: 'JY' },  // Split: single column after JX
-            { start: 'KC', end: 'KJ' },  // Split: was KC-KP, now stops before KK
-            // KK-KO are kept (Rel 3)
-            { start: 'KP', end: 'KP' },  // Split: single column after KO
-            { start: 'KS', end: 'LA' },  // Split: was KS-LG, now stops before LB
-            // LB-LF are kept (Rel 4)
-            { start: 'LG', end: 'LG' },  // Split: single column after LF
-            { start: 'LJ', end: 'LR' },  // Split: was LJ-LX, now stops before LS
-            // LS-LW are kept (Rel 5)
-            { start: 'LX', end: 'LX' },  // Split: single column after LW
-            { start: 'MA', end: 'ME' },  // Split: was MA-MO, now stops before MF
-            // MF-MN are kept (Rel 6)
-            { start: 'MO', end: 'MO' }   // Split: single column after MN
+            // JC-JI are kept (Rel 1: Full Name through Phone 2)
+            { start: 'JJ', end: 'JS' },  // Split: continues after JI (skip Phone 3+), stops before JT
+            // JT-KA are kept (Rel 2: Full Name through Phone 2)
+            { start: 'KB', end: 'KJ' },  // Split: continues after KA (skip Phone 3+), stops before KK
+            // KK-KR are kept (Rel 3: Full Name through Phone 2)
+            { start: 'KS', end: 'LA' },  // Split: continues after KR (skip Phone 3+), stops before LB
+            // LB-LI are kept (Rel 4: Full Name through Phone 2)
+            { start: 'LJ', end: 'LR' },  // Split: continues after LI (skip Phone 3+), stops before LS
+            // LS-LZ are kept (Rel 5: Full Name through Phone 2)
+            { start: 'MA', end: 'ME' },  // Split: continues after LZ (skip Phone 3+), stops before MF
+            // MF-MM are kept (Rel 6: Full Name through Phone 2)
+            { start: 'MN', end: 'MQ' }   // Split: continues after MM (skip Phone 3+), goes to end (MQ)
         ];
         
         // Convert column letters to indices
