@@ -9,6 +9,7 @@ class CSVTransformer {
         this.cleanedBatchData = null;
         this.fileName = '';
         this.statistics = {};
+        this.phoneDbErrorRecords = []; // Array of {phone, name, type, address, city, state, zip, county, errorReason}
         
         this.initializeEventListeners();
     }
@@ -56,6 +57,10 @@ class CSVTransformer {
 
         document.getElementById('downloadCleanedBtn').addEventListener('click', () => {
             this.downloadCleanedBatch();
+        });
+
+        document.getElementById('downloadErrorsBtn').addEventListener('click', () => {
+            this.downloadPhoneDbErrors();
         });
 
         // Preview tabs
@@ -890,6 +895,9 @@ class CSVTransformer {
             const PASSWORD = 'Letmein01';
             const API_ENDPOINT = 'https://phg-phone-api.vercel.app/api/upload';
 
+            // Reset error records for this upload session
+            this.phoneDbErrorRecords = [];
+
             // Show progress modal
             this.showUploadProgress(true);
 
@@ -932,21 +940,66 @@ class CSVTransformer {
                         })
                     })
                     .then(response => response.json())
-                    .catch(error => ({ success: false, error: error.message, batchSize: batch.length }))
+                    .then(result => ({ ...result, originalBatch: batch }))
+                    .catch(error => ({ success: false, error: error.message, originalBatch: batch }))
                 );
 
                 const results = await Promise.all(promises);
 
                 // Accumulate statistics from all parallel results
-                results.forEach((result, idx) => {
+                results.forEach((result) => {
+                    const batch = result.originalBatch;
+                    
                     if (result.success) {
                         totalInserted += result.statistics?.inserted || 0;
                         totalUpdated += result.statistics?.updated || 0;
-                        totalErrors += result.statistics?.errors || 0;
+                        const batchErrors = result.statistics?.errors || 0;
+                        totalErrors += batchErrors;
                         totalInDatabase = result.statistics?.totalInDatabase || totalInDatabase;
+                        
+                        // If API returns specific failed records, capture them
+                        if (result.failedRecords && Array.isArray(result.failedRecords)) {
+                            result.failedRecords.forEach(failed => {
+                                this.phoneDbErrorRecords.push({
+                                    phone: failed.phone || '',
+                                    name: failed.person?.name || '',
+                                    type: failed.person?.type || '',
+                                    address: failed.person?.address || '',
+                                    city: failed.person?.city || '',
+                                    state: failed.person?.state || '',
+                                    zip: failed.person?.zip || '',
+                                    county: failed.person?.county || '',
+                                    errorReason: failed.error || 'Upload Error'
+                                });
+                            });
+                        } else if (batchErrors > 0 && batch) {
+                            // API didn't return specific failed records but reported errors
+                            // We can't know which specific records failed, so we note this
+                            // The errors are counted but individual records can't be identified
+                            console.warn(`Batch had ${batchErrors} errors but API did not return specific failed records`);
+                        }
                     } else {
+                        // Entire batch failed (network error, API error, etc.)
                         console.error('Batch upload error:', result.error);
-                        totalErrors += batchGroup[idx]?.length || BATCH_SIZE;
+                        const batchSize = batch?.length || 0;
+                        totalErrors += batchSize;
+                        
+                        // Add all records from failed batch to error records
+                        if (batch && Array.isArray(batch)) {
+                            batch.forEach(record => {
+                                this.phoneDbErrorRecords.push({
+                                    phone: record.phone || '',
+                                    name: record.person?.name || '',
+                                    type: record.person?.type || '',
+                                    address: record.person?.address || '',
+                                    city: record.person?.city || '',
+                                    state: record.person?.state || '',
+                                    zip: record.person?.zip || '',
+                                    county: record.person?.county || '',
+                                    errorReason: `Batch Upload Failed - ${result.error || 'Network Error'}`
+                                });
+                            });
+                        }
                     }
                 });
             }
@@ -997,6 +1050,7 @@ class CSVTransformer {
     showPhoneDbStatistics(stats) {
         const statisticsSection = document.getElementById('phoneDbStatisticsSection');
         const statisticsGrid = document.getElementById('phoneDbStatisticsGrid');
+        const errorDownloadSection = document.getElementById('errorDownloadSection');
 
         const insertedPercentage = ((stats.inserted / stats.totalProcessed) * 100).toFixed(1);
         const updatedPercentage = ((stats.updated / stats.totalProcessed) * 100).toFixed(1);
@@ -1029,6 +1083,13 @@ class CSVTransformer {
         `;
 
         statisticsSection.classList.add('show');
+
+        // Show or hide the error download section based on whether there are error records
+        if (this.phoneDbErrorRecords && this.phoneDbErrorRecords.length > 0) {
+            errorDownloadSection.style.display = 'block';
+        } else {
+            errorDownloadSection.style.display = 'none';
+        }
     }
 
     showStatistics() {
@@ -1145,6 +1206,45 @@ class CSVTransformer {
         
         link.href = URL.createObjectURL(blob);
         link.download = fileName;
+        link.click();
+    }
+
+    downloadPhoneDbErrors() {
+        if (!this.phoneDbErrorRecords || this.phoneDbErrorRecords.length === 0) {
+            this.showError('No error records available to download.');
+            return;
+        }
+
+        // Create CSV headers matching the format needed for re-upload
+        const headers = ['Phone', 'Name', 'Type', 'Address', 'City', 'State', 'Zip', 'County', 'Error Reason'];
+        
+        // Convert error records to CSV data format
+        const data = this.phoneDbErrorRecords.map(record => [
+            record.phone || '',
+            record.name || '',
+            record.type || '',
+            record.address || '',
+            record.city || '',
+            record.state || '',
+            record.zip || '',
+            record.county || '',
+            record.errorReason || ''
+        ]);
+
+        const csvData = { headers, data };
+        const csvContent = this.convertToCSV(csvData);
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        
+        // Generate filename with original file reference
+        let fileName = 'Phone_Database_Errors';
+        if (this.fileName) {
+            const baseName = this.fileName.replace('.csv', '');
+            fileName = `${baseName} - ERROR_RECORDS`;
+        }
+        
+        link.href = URL.createObjectURL(blob);
+        link.download = fileName + '.csv';
         link.click();
     }
 
