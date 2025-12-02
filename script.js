@@ -734,6 +734,14 @@ class CSVTransformer {
         const { headers, data } = this.originalData;
         const phoneRecords = [];
 
+        // Detect if this is a flattened error CSV format
+        const isFlattenedFormat = this.isFlattenedPhoneFormat(headers);
+        
+        if (isFlattenedFormat) {
+            return this.parseFromFlattenedFormat(headers, data);
+        }
+
+        // Original format parsing below
         // Find column indices by header name
         const debtorIdx = this.findColumnIndex(headers, 'Debtor');
         const phone1Idx = this.findColumnIndex(headers, 'PH: Phone1');
@@ -877,6 +885,55 @@ class CSVTransformer {
             });
         });
 
+        return phoneRecords;
+    }
+
+    isFlattenedPhoneFormat(headers) {
+        // Check if this CSV has the flattened format columns (from error CSV export)
+        // Flattened format has: Phone, Name, Type, Address, City, State, Zip, County, (Error Reason)
+        const hasPhoneCol = headers.some(h => h.toLowerCase() === 'phone');
+        const hasNameCol = headers.some(h => h.toLowerCase() === 'name');
+        const hasTypeCol = headers.some(h => h.toLowerCase() === 'type');
+        
+        return hasPhoneCol && hasNameCol && hasTypeCol;
+    }
+
+    parseFromFlattenedFormat(headers, data) {
+        const phoneRecords = [];
+        
+        // Find column indices for flattened format
+        const phoneIdx = headers.findIndex(h => h.toLowerCase() === 'phone');
+        const nameIdx = headers.findIndex(h => h.toLowerCase() === 'name');
+        const typeIdx = headers.findIndex(h => h.toLowerCase() === 'type');
+        const addressIdx = headers.findIndex(h => h.toLowerCase() === 'address');
+        const cityIdx = headers.findIndex(h => h.toLowerCase() === 'city');
+        const stateIdx = headers.findIndex(h => h.toLowerCase() === 'state');
+        const zipIdx = headers.findIndex(h => h.toLowerCase() === 'zip');
+        const countyIdx = headers.findIndex(h => h.toLowerCase() === 'county');
+        // Note: "Error Reason" column is intentionally ignored
+        
+        data.forEach(row => {
+            const phone = row[phoneIdx] || '';
+            const cleanedPhone = this.cleanPhone(phone);
+            
+            if (cleanedPhone) {
+                const person = {
+                    name: nameIdx !== -1 ? row[nameIdx] || '' : '',
+                    type: typeIdx !== -1 ? row[typeIdx] || 'DEBTOR' : 'DEBTOR',
+                    address: addressIdx !== -1 ? row[addressIdx] || '' : '',
+                    city: cityIdx !== -1 ? row[cityIdx] || '' : '',
+                    state: stateIdx !== -1 ? row[stateIdx] || '' : '',
+                    zip: zipIdx !== -1 ? row[zipIdx] || '' : '',
+                    county: countyIdx !== -1 ? row[countyIdx] || '' : null
+                };
+                
+                phoneRecords.push({
+                    phone: cleanedPhone,
+                    person: person
+                });
+            }
+        });
+        
         return phoneRecords;
     }
 
