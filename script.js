@@ -885,7 +885,8 @@ class CSVTransformer {
                 return;
             }
 
-            const BATCH_SIZE = 500;
+            const BATCH_SIZE = 2000;  // Increased from 500 to 2000
+            const PARALLEL_BATCHES = 5;  // Send 5 batches simultaneously
             const PASSWORD = 'Letmein01';
             const API_ENDPOINT = 'https://phg-phone-api.vercel.app/api/upload';
 
@@ -898,23 +899,29 @@ class CSVTransformer {
             let totalErrors = 0;
             let totalInDatabase = 0;
 
-            // Calculate total batches
-            const totalBatches = Math.ceil(phoneRecords.length / BATCH_SIZE);
-
-            // Upload in batches
+            // Create all batches upfront
+            const batches = [];
             for (let i = 0; i < phoneRecords.length; i += BATCH_SIZE) {
-                const batch = phoneRecords.slice(i, i + BATCH_SIZE);
-                const currentBatch = Math.floor(i / BATCH_SIZE) + 1;
+                batches.push(phoneRecords.slice(i, i + BATCH_SIZE));
+            }
+            const totalBatches = batches.length;
+
+            // Process batches in parallel groups
+            for (let i = 0; i < batches.length; i += PARALLEL_BATCHES) {
+                const batchGroup = batches.slice(i, i + PARALLEL_BATCHES);
+                const currentBatchStart = i + 1;
+                const currentBatchEnd = Math.min(i + PARALLEL_BATCHES, totalBatches);
 
                 // Update progress
-                const progress = (i / phoneRecords.length) * 100;
+                const progress = (i / batches.length) * 100;
                 this.updateUploadProgress(
                     progress,
-                    `Uploading batch ${currentBatch} of ${totalBatches}... (${i} of ${phoneRecords.length} records)`
+                    `Uploading batches ${currentBatchStart}-${currentBatchEnd} of ${totalBatches}...`
                 );
 
-                try {
-                    const response = await fetch(API_ENDPOINT, {
+                // Send all batches in this group simultaneously
+                const promises = batchGroup.map(batch => 
+                    fetch(API_ENDPOINT, {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json'
@@ -923,24 +930,25 @@ class CSVTransformer {
                             password: PASSWORD,
                             phoneRecords: batch
                         })
-                    });
+                    })
+                    .then(response => response.json())
+                    .catch(error => ({ success: false, error: error.message, batchSize: batch.length }))
+                );
 
-                    const result = await response.json();
+                const results = await Promise.all(promises);
 
-                    if (!response.ok || !result.success) {
-                        throw new Error(result.error || 'Upload failed');
+                // Accumulate statistics from all parallel results
+                results.forEach((result, idx) => {
+                    if (result.success) {
+                        totalInserted += result.statistics?.inserted || 0;
+                        totalUpdated += result.statistics?.updated || 0;
+                        totalErrors += result.statistics?.errors || 0;
+                        totalInDatabase = result.statistics?.totalInDatabase || totalInDatabase;
+                    } else {
+                        console.error('Batch upload error:', result.error);
+                        totalErrors += batchGroup[idx]?.length || BATCH_SIZE;
                     }
-
-                    // Accumulate statistics
-                    totalInserted += result.statistics.inserted || 0;
-                    totalUpdated += result.statistics.updated || 0;
-                    totalErrors += result.statistics.errors || 0;
-                    totalInDatabase = result.statistics.totalInDatabase || 0;
-
-                } catch (error) {
-                    console.error('Batch upload error:', error);
-                    totalErrors += batch.length;
-                }
+                });
             }
 
             // Update progress to 100%
