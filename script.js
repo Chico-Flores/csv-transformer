@@ -737,10 +737,10 @@ class CSVTransformer {
         const phone4Idx = this.findColumnIndex(headers, 'PH: Phone4');
         const phone5Idx = this.findColumnIndex(headers, 'PH: Phone5');
         const addressIdx = this.findColumnIndex(headers, 'ADD: Address1');
-        const cityIdx = this.findColumnIndex(headers, 'ADD: City');
-        const stateIdx = this.findColumnIndex(headers, 'ADD: State');
-        const zipIdx = this.findColumnIndex(headers, 'ADD: Zip');
-        const countyIdx = this.findColumnIndex(headers, 'ADD: County');
+        const cityIdx = this.findColumnIndex(headers, 'ADD: Address1 City');
+        const stateIdx = this.findColumnIndex(headers, 'ADD: Address1 State');
+        const zipIdx = this.findColumnIndex(headers, 'ADD: Address1 Zip');
+        const countyIdx = this.findColumnIndex(headers, 'ADD: Address1 County');
 
         // Relative column mappings
         const relatives = [
