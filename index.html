@@ -436,6 +436,28 @@
             display: inline-block;
         }
 
+        .download-btn.error-records {
+            background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
+        }
+
+        .download-btn.error-records:hover {
+            box-shadow: 0 10px 25px rgba(220, 38, 38, 0.4);
+        }
+
+        .error-download-section {
+            margin-top: 20px;
+            text-align: center;
+            padding-top: 20px;
+            border-top: 1px solid #dbeafe;
+        }
+
+        .error-download-hint {
+            color: #6b7280;
+            font-size: 0.9rem;
+            margin-top: 10px;
+            font-style: italic;
+        }
+
         .loading {
             display: none;
             text-align: center;
@@ -657,6 +679,12 @@
                 <h3>Phone Database Upload Results</h3>
                 <div class="statistics-grid" id="phoneDbStatisticsGrid">
                     <!-- Phone database statistics will be populated here -->
+                </div>
+                <div class="error-download-section" id="errorDownloadSection" style="display: none;">
+                    <button class="download-btn error-records show" id="downloadErrorsBtn">
+                        <i class="fas fa-exclamation-triangle"></i> Download Error Records CSV
+                    </button>
+                    <p class="error-download-hint">Download the failed records to review, fix, and re-upload</p>
                 </div>
             </div>
 
