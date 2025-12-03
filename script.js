@@ -846,6 +846,26 @@ class CSVTransformer {
                 }
             });
 
+            // Process POE (Place of Employment) phone
+            const poePhoneIdx = this.findColumnIndex(headers, 'POE: Employer Phone');
+            if (poePhoneIdx !== -1) {
+                const poePhone = this.cleanPhone(row[poePhoneIdx]);
+                if (poePhone) {
+                    phoneRecords.push({
+                        phone: poePhone,
+                        person: {
+                            name: '',
+                            type: 'POSS POE',
+                            address: '',
+                            city: '',
+                            state: '',
+                            zip: '',
+                            county: null
+                        }
+                    });
+                }
+            }
+
             // Process relatives
             relatives.forEach(rel => {
                 const nameIdx = this.findColumnIndex(headers, rel.name);
