@@ -741,6 +741,29 @@ class CSVTransformer {
             return this.parseFromFlattenedFormat(headers, data);
         }
 
+        // Check if this is a POE-only format (single column with just POE phones)
+        const poeOnlyFormat = headers.length === 1 && headers[0] === 'POE: Employer Phone';
+        if (poeOnlyFormat) {
+            data.forEach(row => {
+                const poePhone = this.cleanPhone(row[0]);
+                if (poePhone) {
+                    phoneRecords.push({
+                        phone: poePhone,
+                        person: {
+                            name: '',
+                            type: 'POSS POE',
+                            address: '',
+                            city: '',
+                            state: '',
+                            zip: '',
+                            county: null
+                        }
+                    });
+                }
+            });
+            return phoneRecords;
+        }
+
         // Original format parsing below
         // Find column indices by header name
         const debtorIdx = this.findColumnIndex(headers, 'Debtor');
