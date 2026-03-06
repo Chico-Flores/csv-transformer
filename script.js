@@ -992,7 +992,7 @@ class CSVTransformer {
 
             const BATCH_SIZE = 2000;  // Increased from 500 to 2000
             const PARALLEL_BATCHES = 5;  // Send 5 batches simultaneously
-            const PASSWORD = 'P8LJJF5tPDgRQuikZ';
+            const PASSWORD = 'Letmein01';
             const API_ENDPOINT = 'https://phg-phone-api.vercel.app/api/upload';
 
             // Reset error records for this upload session
@@ -1459,5 +1459,6 @@ class CSVTransformer {
 document.addEventListener('DOMContentLoaded', () => {
     new CSVTransformer();
 }); 
+
 
 
