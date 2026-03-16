@@ -510,7 +510,8 @@ class CSVTransformer {
             { key: 'debtor_city', label: 'City' },
             { key: 'debtor_state', label: 'State' },
             { key: 'debtor_zip', label: 'Zip' },
-            { key: 'client_claim_number', label: 'Claim Number' }
+            { key: 'client_claim_number', label: 'Claim Number' },
+            { key: 'debtor_dob', label: 'DOB' }
         ];
         
         // Build the output columns dynamically based on what exists in the CSV
