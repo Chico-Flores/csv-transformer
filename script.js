@@ -481,14 +481,14 @@ class CSVTransformer {
     }
 
     transformBatch(headers, data) {
-        // Find phone_1 column index
+        // Find the first phone column index to determine where "base" columns end
         const phoneColumnIndex = headers.findIndex(header => 
             header.toLowerCase().includes('phone_1') || 
             header.toLowerCase().includes('phone1') ||
-            header.toLowerCase().includes('phone')
+            header.toLowerCase() === 'phone'
         );
         
-        // Filter out rows with phone numbers
+        // Filter out rows that have a value in phone_1
         let filteredData = data;
         if (phoneColumnIndex !== -1) {
             filteredData = data.filter(row => {
@@ -497,17 +497,35 @@ class CSVTransformer {
             });
         }
         
-        // Keep only columns up to column I (index 8)
-        const maxColumns = Math.min(9, headers.length);
-        const newHeaders = headers.slice(0, maxColumns);
-        const newData = filteredData.map(row => row.slice(0, maxColumns));
+        // Determine which base columns exist by looking up header names
+        // Always skip the first two columns (internal_case_id, case_number)
+        // Then keep: first_name, last_name, ssn, address, city, state, zip
+        // And optionally: client_claim_number (if present)
         
-        // Remove first two columns (A and B) and rename headers
-        const finalHeaders = ['First Name', 'Last Name', 'SSN', 'Address', 'City', 'State', 'Zip'];
-        const finalData = newData.map(row => {
-            // Skip first two columns and take next 7 columns
-            return row.slice(2, 9);
+        const baseColumnNames = [
+            { key: 'debtor_first_name', label: 'First Name' },
+            { key: 'debtor_last_name', label: 'Last Name' },
+            { key: 'debtor_s_s_n', label: 'SSN' },
+            { key: 'debtor_address_one', label: 'Address' },
+            { key: 'debtor_city', label: 'City' },
+            { key: 'debtor_state', label: 'State' },
+            { key: 'debtor_zip', label: 'Zip' },
+            { key: 'client_claim_number', label: 'Claim Number' }
+        ];
+        
+        // Build the output columns dynamically based on what exists in the CSV
+        const outputColumns = [];
+        baseColumnNames.forEach(col => {
+            const idx = headers.findIndex(h => h.toLowerCase() === col.key.toLowerCase());
+            if (idx !== -1) {
+                outputColumns.push({ index: idx, label: col.label });
+            }
         });
+        
+        const finalHeaders = outputColumns.map(col => col.label);
+        const finalData = filteredData.map(row => 
+            outputColumns.map(col => row[col.index] || '')
+        );
         
         return { headers: finalHeaders, data: finalData };
     }
@@ -1458,7 +1476,4 @@ class CSVTransformer {
 // Initialize the application when the page loads
 document.addEventListener('DOMContentLoaded', () => {
     new CSVTransformer();
-}); 
-
-
-
+});
