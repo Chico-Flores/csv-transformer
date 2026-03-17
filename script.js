@@ -227,6 +227,8 @@ class CSVTransformer {
                 return this.transformDialer(headers, data);
             case 'import':
                 return this.transformImport(headers, data);
+            case 'quicksearch':
+                return this.transformQuickSearch(headers, data);
             default:
                 throw new Error('Unknown format selected');
         }
@@ -1052,6 +1054,20 @@ class CSVTransformer {
             return [firstName, lastName, ssn, address, city, state, zip, phone, email, status];
         });
         
+        return { headers: newHeaders, data: newData };
+    }
+
+    transformQuickSearch(headers, data) {
+        // Take the first column and duplicate it as file_number
+        const sourceIdx = 0;
+        const sourceHeader = headers[sourceIdx] || 'case_number';
+
+        const newHeaders = [sourceHeader, 'file_number'];
+        const newData = data.map(row => {
+            const value = row[sourceIdx] || '';
+            return [value, value];
+        });
+
         return { headers: newHeaders, data: newData };
     }
 
