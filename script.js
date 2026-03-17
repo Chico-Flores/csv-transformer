@@ -385,14 +385,14 @@ class CSVTransformer {
 
     // ── RETURNED BATCH EMS ──────────────────────────────────────────────
     // Name-based column selection for EMS vendor CSV format.
-    // Produces identical output structure as applyReturnedBatchTransformation():
-    //   - STATUS UPDATE:  Social | Status  (Deceased / Bankruptcy rows)
-    //   - CLEANED BATCH:  Debtor, SSN, Phones, Address, POE, Owner2, Vehicle, REL1-5
+    // Column order matches original vendor cleaned batch output:
+    //   Debtor, SSN, DOB, Phones, Email, Address, POE, Property, Owner2,
+    //   Prop details, Vehicle, REL1-5
     // ────────────────────────────────────────────────────────────────────
     applyReturnedBatchEMSTransformation() {
         const { headers, data } = this.originalData;
 
-        // Step 1: Define columns to keep (by exact header name)
+        // Step 1: Define columns to keep — ordered to match original vendor output
         const columnsToKeep = [
             // Debtor identity (First + Last will be merged into "Debtor")
             'INPUT: First Name',
@@ -403,24 +403,41 @@ class CSVTransformer {
             'DEC: Deceased (Y/N/U)',
             'BNK: Bankrupt (Y/N/U)',
 
-            // Debtor phones (EMS has 3)
+            // Date of birth
+            'DOB: Date',
+
+            // Debtor phones (EMS has 3; original had 5)
             'PH: Phone1',
             'PH: Phone2',
             'PH: Phone3',
 
-            // Debtor address
+            // Email (EMS has 1; original had 2)
+            'EMAIL: Email1',
+
+            // Debtor address (EMS has no County; original did)
             'ADD: Address1',
             'ADD: Address1 City',
             'ADD: Address1 State',
             'ADD: Address1 Zip',
 
             // Employment
+            'POE: Employer Name',
             'POE: Employer Phone',
+
+            // Property
+            'PROP: Property (Y/N/U)',
 
             // Property Owner2 (will be merged into one column)
             'PROP: Owner2 First Name',
             'PROP: Owner2 Middle Initial',
             'PROP: Owner2 Last Name',
+
+            // Property details
+            'PROP: Address Full',
+            'PROP: Purchase Amount',
+            'PROP: Purchase Date',
+            'PROP: Assessed Value',
+            'PROP: Market Value',
 
             // Vehicle (will be merged into one column)
             'VEHICLE: Model Year',
