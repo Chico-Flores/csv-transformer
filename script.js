@@ -221,6 +221,8 @@ class CSVTransformer {
         switch (this.selectedFormat) {
             case 'batch':
                 return this.transformBatch(headers, data);
+            case 'batch_ems':
+                return this.transformBatchEMS(headers, data);
             case 'dialer':
                 return this.transformDialer(headers, data);
             case 'import':
@@ -744,6 +746,88 @@ class CSVTransformer {
         );
         
         return { headers: finalHeaders, data: finalData };
+    }
+
+    // ── EMS BATCH ───────────────────────────────────────────────────────
+    // Transforms CRM export into EMS vendor batch format.
+    // Filters: keeps rows with 3 or fewer phone numbers.
+    // Renames/reorders columns to match vendor spec.
+    // Auto-fills Scrub Date with today's date, Middle Name left blank.
+    // Account Key preserved as plain number string (no scientific notation).
+    // ────────────────────────────────────────────────────────────────────
+    transformBatchEMS(headers, data) {
+        // Step 1: Count phones per row and filter — keep rows with 3 or fewer phones
+        const phoneIndices = [];
+        headers.forEach((h, i) => {
+            // Match phone_1, phone_2, ... phone_70 (the actual number columns, not type/status/etc)
+            if (/^phone_\d+$/i.test(h)) {
+                phoneIndices.push(i);
+            }
+        });
+
+        const filteredData = data.filter(row => {
+            let phoneCount = 0;
+            for (const idx of phoneIndices) {
+                if (row[idx] && row[idx].trim() !== '') {
+                    phoneCount++;
+                    if (phoneCount > 3) return false; // Early exit
+                }
+            }
+            return true;
+        });
+
+        // Step 2: Map CRM columns to EMS vendor columns
+        const claimIdx = headers.findIndex(h => h.toLowerCase() === 'client_claim_number');
+        const ssnIdx = headers.findIndex(h => h.toLowerCase() === 'debtor_s_s_n');
+        const dobIdx = headers.findIndex(h => h.toLowerCase() === 'debtor_dob');
+        const lastNameIdx = headers.findIndex(h => h.toLowerCase() === 'debtor_last_name');
+        const firstNameIdx = headers.findIndex(h => h.toLowerCase() === 'debtor_first_name');
+        const addressIdx = headers.findIndex(h => h.toLowerCase() === 'debtor_address_one');
+        const cityIdx = headers.findIndex(h => h.toLowerCase() === 'debtor_city');
+        const stateIdx = headers.findIndex(h => h.toLowerCase() === 'debtor_state');
+        const zipIdx = headers.findIndex(h => h.toLowerCase() === 'debtor_zip');
+
+        // Step 3: Build today's date in M/D/YYYY format
+        const today = new Date();
+        const scrubDate = (today.getMonth() + 1) + '/' + today.getDate() + '/' + today.getFullYear();
+
+        // Step 4: Build output in EMS vendor column order
+        const emsHeaders = [
+            'Account Key_ Account #',
+            'SSN',
+            'Date of Birth',
+            'Last Name',
+            'Middle Name',
+            'First Name',
+            'CUST_ADDRESS',
+            'CUST_CITY',
+            'CUST_STATE',
+            'CUST_ZIP',
+            'Scrub Date_CO Date'
+        ];
+
+        const emsData = filteredData.map(row => {
+            // Ensure Account Key stays as plain number string (no scientific notation)
+            let accountKey = claimIdx !== -1 ? (row[claimIdx] || '') : '';
+            // Strip any non-digit characters just in case, keep as string
+            accountKey = accountKey.replace(/[^\d]/g, '');
+
+            return [
+                accountKey,
+                ssnIdx !== -1 ? (row[ssnIdx] || '') : '',
+                dobIdx !== -1 ? (row[dobIdx] || '') : '',
+                lastNameIdx !== -1 ? (row[lastNameIdx] || '') : '',
+                '',  // Middle Name — always blank (CRM doesn't have a separate middle name field)
+                firstNameIdx !== -1 ? (row[firstNameIdx] || '') : '',
+                addressIdx !== -1 ? (row[addressIdx] || '') : '',
+                cityIdx !== -1 ? (row[cityIdx] || '') : '',
+                stateIdx !== -1 ? (row[stateIdx] || '') : '',
+                zipIdx !== -1 ? (row[zipIdx] || '') : '',
+                scrubDate
+            ];
+        });
+
+        return { headers: emsHeaders, data: emsData };
     }
 
     transformDialer(headers, data) {
