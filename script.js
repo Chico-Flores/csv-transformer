@@ -1008,7 +1008,27 @@ class CSVTransformer {
         const reorderedHeaders = newOrder.map(i => headers[i]);
         const reorderedData = data.map(row => newOrder.map(i => row[i] || ''));
         
-        return { headers: reorderedHeaders, data: reorderedData };
+        // Rename headers to match dialer system field names for auto-mapping
+        const headerRenameMap = {
+            'phone_1': '* Phone *',
+            'internal_case_id': 'Internal ID',
+            'case_number': 'File number',
+            'debtor_full_name': 'Debtor Name',
+            'batch_dob': 'DOB + S.S. #',
+            'debtor_address_one': 'House, Street',
+            'debtor_city': 'City, State'
+        };
+
+        const renamedHeaders = reorderedHeaders.map(h => {
+            // Check exact match first
+            if (headerRenameMap[h]) return headerRenameMap[h];
+            // Rename phone_2 → phone2, phone_3 → phone3, etc.
+            const phoneMatch = h.match(/^phone_(\d+)$/i);
+            if (phoneMatch) return 'phone' + phoneMatch[1];
+            return h;
+        });
+
+        return { headers: renamedHeaders, data: reorderedData };
     }
 
     transformImport(headers, data) {
