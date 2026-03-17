@@ -1506,24 +1506,54 @@ class CSVTransformer {
 
     downloadCleanedBatch() {
         if (!this.cleanedBatchData) return;
-        
-        const csvContent = this.convertToCSV(this.cleanedBatchData);
-        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-        const link = document.createElement('a');
-        
-        // Extract "batch" part from original filename and add "- CLEANED BATCH"
-        let fileName = this.fileName;
-        if (fileName.toLowerCase().includes('batch')) {
-            const batchIndex = fileName.toLowerCase().indexOf('batch');
-            const beforeBatch = fileName.substring(0, batchIndex + 5); // Include "batch"
-            fileName = beforeBatch + ' - CLEANED BATCH.csv';
+
+        const MAX_ROWS_PER_FILE = 3000;
+        const totalRows = this.cleanedBatchData.data.length;
+
+        // Build base filename
+        let baseFileName = this.fileName;
+        if (baseFileName.toLowerCase().includes('batch')) {
+            const batchIndex = baseFileName.toLowerCase().indexOf('batch');
+            baseFileName = baseFileName.substring(0, batchIndex + 5) + ' - CLEANED BATCH';
         } else {
-            fileName = this.fileName.replace('.csv', '') + ' - CLEANED BATCH.csv';
+            baseFileName = this.fileName.replace('.csv', '') + ' - CLEANED BATCH';
         }
-        
-        link.href = URL.createObjectURL(blob);
-        link.download = fileName;
-        link.click();
+
+        // If 3000 rows or less, download as single file (no splitting needed)
+        if (totalRows <= MAX_ROWS_PER_FILE) {
+            const csvContent = this.convertToCSV(this.cleanedBatchData);
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = baseFileName + '.csv';
+            link.click();
+            return;
+        }
+
+        // Split into multiple files, each with headers + up to 3000 data rows
+        const totalParts = Math.ceil(totalRows / MAX_ROWS_PER_FILE);
+        const headers = this.cleanedBatchData.headers;
+
+        for (let i = 0; i < totalParts; i++) {
+            const start = i * MAX_ROWS_PER_FILE;
+            const end = Math.min(start + MAX_ROWS_PER_FILE, totalRows);
+            const chunkData = this.cleanedBatchData.data.slice(start, end);
+
+            const partData = { headers: headers, data: chunkData };
+            const csvContent = this.convertToCSV(partData);
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+
+            const partNum = i + 1;
+            const partFileName = baseFileName + ' (Part ' + partNum + ' of ' + totalParts + ').csv';
+
+            // Stagger downloads with 800ms delay so browser doesn't block them
+            setTimeout(() => {
+                const link = document.createElement('a');
+                link.href = URL.createObjectURL(blob);
+                link.download = partFileName;
+                link.click();
+            }, i * 800);
+        }
     }
 
     downloadPhoneDbErrors() {
