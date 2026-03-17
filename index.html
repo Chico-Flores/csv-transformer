@@ -146,6 +146,24 @@
             color: #10b981;
         }
 
+        .format-option[data-format="returned_ems"] {
+            border-color: #fde68a;
+        }
+
+        .format-option[data-format="returned_ems"]:hover {
+            border-color: #f59e0b;
+            box-shadow: 0 10px 25px rgba(245, 158, 11, 0.1);
+        }
+
+        .format-option[data-format="returned_ems"].selected {
+            border-color: #f59e0b;
+            background: #fffbeb;
+        }
+
+        .format-option[data-format="returned_ems"] .icon {
+            color: #f59e0b;
+        }
+
         .file-upload {
             background: #f8fafc;
             border: 2px dashed #cbd5e1;
@@ -617,6 +635,11 @@
                         <h3>RETURNED BATCH</h3>
                         <p>Process returned items - creates STATUS UPDATE and CLEANED BATCH files</p>
                     </div>
+                    <div class="format-option" data-format="returned_ems">
+                        <div class="icon"><i class="fas fa-check-circle"></i></div>
+                        <h3>RETURNED BATCH EMS</h3>
+                        <p>Process EMS vendor returns - creates STATUS UPDATE and CLEANED BATCH files</p>
+                    </div>
                     <div class="format-option" data-format="import">
                         <div class="icon"><i class="fas fa-check-circle"></i></div>
                         <h3>IMPORT NEW</h3>
@@ -733,4 +756,4 @@
 
     <script src="script.js"></script>
 </body>
-</html> 
+</html>
