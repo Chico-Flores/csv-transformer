@@ -930,13 +930,85 @@ class CSVTransformer {
                     row.filter((_, index) => index !== colFIndex && index !== colGIndex)
                 );
                 
-                return { headers: finalHeadersMerged, data: finalDataMerged };
+                // Step 8: Reorder columns — phone_1 first, then case info, then phone_2+
+                // Current order: internal_case_id, case_number, debtor_full_name, debtor_address_one, debtor_city, batch_dob, phone_1, phone_2, ...
+                // Desired order: phone_1, internal_case_id, case_number, debtor_full_name, batch_dob, debtor_address_one, debtor_city, phone_2, phone_3, ...
+                const reordered = this.reorderDialerColumns(finalHeadersMerged, finalDataMerged);
+                return reordered;
             }
             
-            return { headers: finalHeaders, data: finalDataWithoutSsn };
+            return this.reorderDialerColumns(finalHeaders, finalDataWithoutSsn);
         }
         
-        return { headers: filteredHeaders, data: ssnData };
+        return this.reorderDialerColumns(filteredHeaders, ssnData);
+    }
+
+    reorderDialerColumns(headers, data) {
+        // Desired order: phone_1, internal_case_id, case_number, debtor_full_name,
+        //                batch_dob, debtor_address_one, debtor_city, phone_2, phone_3, ... phone_20
+        
+        // Find phone_1 index
+        const phone1Idx = headers.findIndex(h => /^phone_1$/i.test(h));
+        
+        // Find the case info columns by their position (first non-phone columns)
+        // After all prior merges these are the first columns before phone_1
+        const caseInfoIndices = [];
+        const phoneIndices = [];
+        
+        headers.forEach((h, i) => {
+            if (/^phone_\d+$/i.test(h)) {
+                phoneIndices.push(i);
+            } else {
+                caseInfoIndices.push(i);
+            }
+        });
+        
+        if (phone1Idx === -1 || caseInfoIndices.length === 0) {
+            // Can't reorder, return as-is
+            return { headers, data };
+        }
+        
+        // Build the desired column order by name matching
+        // First: phone_1
+        // Then: internal_case_id, case_number, debtor_full_name, batch_dob, debtor_address_one, debtor_city
+        // Then: phone_2, phone_3, ... phone_20
+        
+        const desiredCaseOrder = [
+            'internal_case_id',
+            'case_number',
+            'debtor_full_name',
+            'batch_dob',
+            'debtor_address_one',
+            'debtor_city'
+        ];
+        
+        // Build new index order
+        const newOrder = [];
+        
+        // 1. phone_1 first
+        if (phone1Idx !== -1) newOrder.push(phone1Idx);
+        
+        // 2. Case info columns in desired order
+        desiredCaseOrder.forEach(name => {
+            const idx = headers.findIndex(h => h.toLowerCase() === name.toLowerCase());
+            if (idx !== -1 && !newOrder.includes(idx)) newOrder.push(idx);
+        });
+        
+        // 3. Any remaining case info columns not in the desired list (safety net)
+        caseInfoIndices.forEach(idx => {
+            if (!newOrder.includes(idx)) newOrder.push(idx);
+        });
+        
+        // 4. phone_2 through phone_20 (skip phone_1, already added)
+        phoneIndices.forEach(idx => {
+            if (!newOrder.includes(idx)) newOrder.push(idx);
+        });
+        
+        // Reindex headers and data
+        const reorderedHeaders = newOrder.map(i => headers[i]);
+        const reorderedData = data.map(row => newOrder.map(i => row[i] || ''));
+        
+        return { headers: reorderedHeaders, data: reorderedData };
     }
 
     transformImport(headers, data) {
