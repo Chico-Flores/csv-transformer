@@ -164,6 +164,24 @@
             color: #f59e0b;
         }
 
+        .format-option[data-format="batch_ems"] {
+            border-color: #a7f3d0;
+        }
+
+        .format-option[data-format="batch_ems"]:hover {
+            border-color: #059669;
+            box-shadow: 0 10px 25px rgba(5, 150, 105, 0.1);
+        }
+
+        .format-option[data-format="batch_ems"].selected {
+            border-color: #059669;
+            background: #ecfdf5;
+        }
+
+        .format-option[data-format="batch_ems"] .icon {
+            color: #059669;
+        }
+
         .file-upload {
             background: #f8fafc;
             border: 2px dashed #cbd5e1;
@@ -624,6 +642,11 @@
                         <div class="icon"><i class="fas fa-check-circle"></i></div>
                         <h3>BATCH</h3>
                         <p>Remove phone numbers, trim columns, rename headers for batch processing</p>
+                    </div>
+                    <div class="format-option" data-format="batch_ems">
+                        <div class="icon"><i class="fas fa-check-circle"></i></div>
+                        <h3>EMS BATCH</h3>
+                        <p>Format CRM export for EMS vendor - filters phones, renames columns, adds scrub date</p>
                     </div>
                     <div class="format-option" data-format="dialer">
                         <div class="icon"><i class="fas fa-check-circle"></i></div>
