@@ -189,8 +189,10 @@ class CSVTransformer {
             // Simulate processing time for large files
             await new Promise(resolve => setTimeout(resolve, 500));
             
-            if (this.selectedFormat === 'returned') {
-                const result = this.applyReturnedBatchTransformation();
+            if (this.selectedFormat === 'returned' || this.selectedFormat === 'returned_ems') {
+                const result = this.selectedFormat === 'returned_ems'
+                    ? this.applyReturnedBatchEMSTransformation()
+                    : this.applyReturnedBatchTransformation();
                 this.statusUpdateData = result.statusUpdate;
                 this.cleanedBatchData = result.cleanedBatch;
                 this.statistics = result.statistics;
@@ -377,6 +379,202 @@ class CSVTransformer {
                 bankruptcy: bankruptcyRows.length,
                 totalStatus: statusUpdateData.length,
                 remaining: finalData.length
+            }
+        };
+    }
+
+    // ── RETURNED BATCH EMS ──────────────────────────────────────────────
+    // Name-based column selection for EMS vendor CSV format.
+    // Produces identical output structure as applyReturnedBatchTransformation():
+    //   - STATUS UPDATE:  Social | Status  (Deceased / Bankruptcy rows)
+    //   - CLEANED BATCH:  Debtor, SSN, Phones, Address, POE, Owner2, Vehicle, REL1-5
+    // ────────────────────────────────────────────────────────────────────
+    applyReturnedBatchEMSTransformation() {
+        const { headers, data } = this.originalData;
+
+        // Step 1: Define columns to keep (by exact header name)
+        const columnsToKeep = [
+            // Debtor identity (First + Last will be merged into "Debtor")
+            'INPUT: First Name',
+            'INPUT: Last Name',
+            'INPUT: SSN',
+
+            // Filtering columns (removed after STATUS UPDATE extraction)
+            'DEC: Deceased (Y/N/U)',
+            'BNK: Bankrupt (Y/N/U)',
+
+            // Debtor phones (EMS has 3)
+            'PH: Phone1',
+            'PH: Phone2',
+            'PH: Phone3',
+
+            // Debtor address
+            'ADD: Address1',
+            'ADD: Address1 City',
+            'ADD: Address1 State',
+            'ADD: Address1 Zip',
+
+            // Employment
+            'POE: Employer Phone',
+
+            // Property Owner2 (will be merged into one column)
+            'PROP: Owner2 First Name',
+            'PROP: Owner2 Middle Initial',
+            'PROP: Owner2 Last Name',
+
+            // Vehicle (will be merged into one column)
+            'VEHICLE: Model Year',
+            'VEHICLE: Make',
+            'VEHICLE: Model',
+
+            // Relative 1
+            'REL1: Full Name', 'REL1: Address', 'REL1: City', 'REL1: State', 'REL1: Zip',
+            'REL1: Phone 1', 'REL1: Phone 2',
+
+            // Relative 2
+            'REL2: Full Name', 'REL2: Address', 'REL2: City', 'REL2: State', 'REL2: Zip',
+            'REL2: Phone 1', 'REL2: Phone 2',
+
+            // Relative 3
+            'REL3: Full Name', 'REL3: Address', 'REL3: City', 'REL3: State', 'REL3: Zip',
+            'REL3: Phone 1', 'REL3: Phone 2',
+
+            // Relative 4
+            'REL4: Full Name', 'REL4: Address', 'REL4: City', 'REL4: State', 'REL4: Zip',
+            'REL4: Phone 1', 'REL4: Phone 2',
+
+            // Relative 5
+            'REL5: Full Name', 'REL5: Address', 'REL5: City', 'REL5: State', 'REL5: Zip',
+            'REL5: Phone 1', 'REL5: Phone 2',
+        ];
+
+        // Step 2: Build index map (header name → column index in CSV)
+        const keepIndices = [];
+        const keepHeaders = [];
+        columnsToKeep.forEach(colName => {
+            const idx = this.findColumnIndex(headers, colName);
+            if (idx !== -1) {
+                keepIndices.push(idx);
+                keepHeaders.push(colName);
+            }
+        });
+
+        // Extract only the columns we want
+        let currentHeaders = [...keepHeaders];
+        let currentData = data.map(row => keepIndices.map(idx => row[idx] || ''));
+
+        // Step 3: Merge INPUT: First Name + INPUT: Last Name → "Debtor"
+        const firstNameIdx = currentHeaders.indexOf('INPUT: First Name');
+        const lastNameIdx = currentHeaders.indexOf('INPUT: Last Name');
+
+        if (firstNameIdx !== -1 && lastNameIdx !== -1) {
+            currentData = currentData.map(row => {
+                const newRow = [...row];
+                const firstName = row[firstNameIdx] || '';
+                const lastName = row[lastNameIdx] || '';
+                newRow[firstNameIdx] = [firstName, lastName].filter(n => n).join(' ');
+                return newRow;
+            });
+
+            // Rename first name column to "Debtor", remove last name column
+            currentHeaders = currentHeaders.map((h, i) => i === firstNameIdx ? 'Debtor' : h);
+            currentHeaders = currentHeaders.filter((_, i) => i !== lastNameIdx);
+            currentData = currentData.map(row => row.filter((_, i) => i !== lastNameIdx));
+        }
+
+        // Step 4: Extract deceased records → STATUS UPDATE
+        const deceasedIdx = currentHeaders.indexOf('DEC: Deceased (Y/N/U)');
+        const ssnIdx = currentHeaders.indexOf('INPUT: SSN');
+
+        if (deceasedIdx === -1 || ssnIdx === -1) {
+            throw new Error('Could not find required columns: DEC: Deceased (Y/N/U) or INPUT: SSN');
+        }
+
+        const deceasedRows = currentData.filter(row => row[deceasedIdx] === 'Y');
+        const nonDeceasedData = currentData.filter(row => row[deceasedIdx] !== 'Y');
+
+        // Step 5: Extract bankruptcy records → STATUS UPDATE
+        const bankruptcyIdx = currentHeaders.indexOf('BNK: Bankrupt (Y/N/U)');
+
+        if (bankruptcyIdx === -1) {
+            throw new Error('Could not find required column: BNK: Bankrupt (Y/N/U)');
+        }
+
+        const bankruptcyRows = nonDeceasedData.filter(row => row[bankruptcyIdx] === 'Y');
+        const cleanData = nonDeceasedData.filter(row => row[bankruptcyIdx] !== 'Y');
+
+        // Build STATUS UPDATE data
+        const statusUpdateData = [];
+        deceasedRows.forEach(row => {
+            statusUpdateData.push([row[ssnIdx], 'Deceased']);
+        });
+        bankruptcyRows.forEach(row => {
+            statusUpdateData.push([row[ssnIdx], 'Bankruptcy']);
+        });
+
+        // Step 6: Remove deceased and bankruptcy columns from clean data
+        const indicesToRemove = [deceasedIdx, bankruptcyIdx].sort((a, b) => b - a);
+        indicesToRemove.forEach(idx => {
+            currentHeaders = currentHeaders.filter((_, i) => i !== idx);
+            cleanData.forEach((row, rowIdx) => {
+                cleanData[rowIdx] = row.filter((_, i) => i !== idx);
+            });
+        });
+
+        // Step 7: Merge PROP: Owner2 columns into one
+        const owner2FirstIdx = currentHeaders.indexOf('PROP: Owner2 First Name');
+        const owner2MiddleIdx = currentHeaders.indexOf('PROP: Owner2 Middle Initial');
+        const owner2LastIdx = currentHeaders.indexOf('PROP: Owner2 Last Name');
+
+        if (owner2FirstIdx !== -1 && owner2MiddleIdx !== -1 && owner2LastIdx !== -1) {
+            cleanData.forEach(row => {
+                const first = row[owner2FirstIdx] || '';
+                const middle = row[owner2MiddleIdx] || '';
+                const last = row[owner2LastIdx] || '';
+                row[owner2FirstIdx] = [first, middle, last].filter(n => n).join(' ');
+            });
+
+            const ownerRemoveIndices = [owner2MiddleIdx, owner2LastIdx].sort((a, b) => b - a);
+            ownerRemoveIndices.forEach(idx => {
+                currentHeaders = currentHeaders.filter((_, i) => i !== idx);
+                cleanData.forEach((row, rowIdx) => {
+                    cleanData[rowIdx] = row.filter((_, i) => i !== idx);
+                });
+            });
+        }
+
+        // Step 8: Merge VEHICLE columns into one
+        const vehicleYearIdx = currentHeaders.indexOf('VEHICLE: Model Year');
+        const vehicleMakeIdx = currentHeaders.indexOf('VEHICLE: Make');
+        const vehicleModelIdx = currentHeaders.indexOf('VEHICLE: Model');
+
+        if (vehicleYearIdx !== -1 && vehicleMakeIdx !== -1 && vehicleModelIdx !== -1) {
+            cleanData.forEach(row => {
+                const year = row[vehicleYearIdx] || '';
+                const make = row[vehicleMakeIdx] || '';
+                const model = row[vehicleModelIdx] || '';
+                row[vehicleYearIdx] = [year, make, model].filter(v => v).join(' ');
+            });
+
+            const vehicleRemoveIndices = [vehicleMakeIdx, vehicleModelIdx].sort((a, b) => b - a);
+            vehicleRemoveIndices.forEach(idx => {
+                currentHeaders = currentHeaders.filter((_, i) => i !== idx);
+                cleanData.forEach((row, rowIdx) => {
+                    cleanData[rowIdx] = row.filter((_, i) => i !== idx);
+                });
+            });
+        }
+
+        // Return results in same format as applyReturnedBatchTransformation()
+        return {
+            statusUpdate: { headers: ['Social', 'Status'], data: statusUpdateData },
+            cleanedBatch: { headers: currentHeaders, data: cleanData },
+            statistics: {
+                totalOriginal: data.length,
+                deceased: deceasedRows.length,
+                bankruptcy: bankruptcyRows.length,
+                totalStatus: statusUpdateData.length,
+                remaining: cleanData.length
             }
         };
     }
