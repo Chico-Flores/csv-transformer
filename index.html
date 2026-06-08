@@ -164,6 +164,24 @@
             color: #f59e0b;
         }
 
+        .format-option[data-format="returned_orn"] {
+            border-color: #ddd6fe;
+        }
+
+        .format-option[data-format="returned_orn"]:hover {
+            border-color: #8b5cf6;
+            box-shadow: 0 10px 25px rgba(139, 92, 246, 0.1);
+        }
+
+        .format-option[data-format="returned_orn"].selected {
+            border-color: #8b5cf6;
+            background: #f5f3ff;
+        }
+
+        .format-option[data-format="returned_orn"] .icon {
+            color: #8b5cf6;
+        }
+
         .format-option[data-format="batch_ems"] {
             border-color: #a7f3d0;
         }
@@ -685,6 +703,11 @@
                         <div class="icon"><i class="fas fa-check-circle"></i></div>
                         <h3>RETURNED BATCH EMS</h3>
                         <p>Process EMS vendor returns - creates STATUS UPDATE and CLEANED BATCH files</p>
+                    </div>
+                    <div class="format-option" data-format="returned_orn">
+                        <div class="icon"><i class="fas fa-check-circle"></i></div>
+                        <h3>RETURNED BATCH ORN</h3>
+                        <p>Process ORN vendor returns - creates STATUS UPDATE and CLEANED BATCH files</p>
                     </div>
                     <div class="format-option" data-format="import">
                         <div class="icon"><i class="fas fa-check-circle"></i></div>
