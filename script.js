@@ -189,9 +189,11 @@ class CSVTransformer {
             // Simulate processing time for large files
             await new Promise(resolve => setTimeout(resolve, 500));
             
-            if (this.selectedFormat === 'returned' || this.selectedFormat === 'returned_ems') {
+            if (this.selectedFormat === 'returned' || this.selectedFormat === 'returned_ems' || this.selectedFormat === 'returned_orn') {
                 const result = this.selectedFormat === 'returned_ems'
                     ? this.applyReturnedBatchEMSTransformation()
+                    : this.selectedFormat === 'returned_orn'
+                    ? this.applyReturnedBatchORNTransformation()
                     : this.applyReturnedBatchTransformation();
                 this.statusUpdateData = result.statusUpdate;
                 this.cleanedBatchData = result.cleanedBatch;
@@ -589,6 +591,161 @@ class CSVTransformer {
         }
 
         // Return results in same format as applyReturnedBatchTransformation()
+        return {
+            statusUpdate: { headers: ['Social', 'Status'], data: statusUpdateData },
+            cleanedBatch: { headers: currentHeaders, data: cleanData },
+            statistics: {
+                totalOriginal: data.length,
+                deceased: deceasedRows.length,
+                bankruptcy: bankruptcyRows.length,
+                totalStatus: statusUpdateData.length,
+                remaining: cleanData.length
+            }
+        };
+    }
+
+    // ── RETURNED BATCH ORN ──────────────────────────────────────────────
+    // Name-based column selection for ORN vendor return CSV format.
+    // Produces STATUS UPDATE (Deceased/Bankruptcy) + CLEANED BATCH.
+    // REL names merged from First + Middle + Last. No DOB, Email,
+    // Property, Vehicle, or REL addresses in ORN returns.
+    // ────────────────────────────────────────────────────────────────────
+    applyReturnedBatchORNTransformation() {
+        const { headers, data } = this.originalData;
+
+        // Step 1: Define columns to keep
+        const columnsToKeep = [
+            // Debtor identity
+            'INPUT: Full Name',
+            'INPUT: SSN',
+            'INPUT: Account Key',
+
+            // Filtering columns (removed after STATUS UPDATE extraction)
+            'DEC: Deceased (Y/N/U)',
+            'BNK: Bankrupt (Y/N/U)',
+
+            // Debtor phones (ORN returns 4)
+            'PH: Phone1',
+            'PH: Phone2',
+            'PH: Phone3',
+            'PH: Phone4',
+
+            // Debtor address
+            'ADD: Address1',
+            'ADD: Address1 City',
+            'ADD: Address1 State',
+            'ADD: Address1 Zip',
+            'ADD: Address1 County',
+
+            // Employment
+            'POE: Employer Name',
+            'POE: Employer Phone',
+
+            // Relative 1 (name split — will be merged)
+            'REL1: First Name',
+            'REL1: Middle Name',
+            'REL1: Last Name',
+            'REL1: Phone 1',
+
+            // Relative 2
+            'REL2: First Name',
+            'REL2: Middle Name',
+            'REL2: Last Name',
+            'REL2: Phone 1',
+
+            // Relative 3
+            'REL3: First Name',
+            'REL3: Middle Name',
+            'REL3: Last Name',
+            'REL3: Phone 1',
+        ];
+
+        // Step 2: Build index map
+        const keepIndices = [];
+        const keepHeaders = [];
+        columnsToKeep.forEach(colName => {
+            const idx = this.findColumnIndex(headers, colName);
+            if (idx !== -1) {
+                keepIndices.push(idx);
+                keepHeaders.push(colName);
+            }
+        });
+
+        let currentHeaders = [...keepHeaders];
+        let currentData = data.map(row => keepIndices.map(idx => row[idx] || ''));
+
+        // Step 3: Rename INPUT: Full Name → "Debtor"
+        const fullNameIdx = currentHeaders.indexOf('INPUT: Full Name');
+        if (fullNameIdx !== -1) {
+            currentHeaders[fullNameIdx] = 'Debtor';
+        }
+
+        // Step 4: Extract deceased records → STATUS UPDATE
+        const deceasedIdx = currentHeaders.indexOf('DEC: Deceased (Y/N/U)');
+        const ssnIdx = currentHeaders.indexOf('INPUT: SSN');
+
+        if (deceasedIdx === -1 || ssnIdx === -1) {
+            throw new Error('Could not find required columns: DEC: Deceased (Y/N/U) or INPUT: SSN');
+        }
+
+        const deceasedRows = currentData.filter(row => row[deceasedIdx] === 'Y');
+        const nonDeceasedData = currentData.filter(row => row[deceasedIdx] !== 'Y');
+
+        // Step 5: Extract bankruptcy records → STATUS UPDATE
+        const bankruptcyIdx = currentHeaders.indexOf('BNK: Bankrupt (Y/N/U)');
+
+        if (bankruptcyIdx === -1) {
+            throw new Error('Could not find required column: BNK: Bankrupt (Y/N/U)');
+        }
+
+        const bankruptcyRows = nonDeceasedData.filter(row => row[bankruptcyIdx] === 'Y');
+        const cleanData = nonDeceasedData.filter(row => row[bankruptcyIdx] !== 'Y');
+
+        // Build STATUS UPDATE data
+        const statusUpdateData = [];
+        deceasedRows.forEach(row => {
+            statusUpdateData.push([row[ssnIdx], 'Deceased']);
+        });
+        bankruptcyRows.forEach(row => {
+            statusUpdateData.push([row[ssnIdx], 'Bankruptcy']);
+        });
+
+        // Step 6: Remove deceased and bankruptcy columns from clean data
+        const indicesToRemove = [deceasedIdx, bankruptcyIdx].sort((a, b) => b - a);
+        indicesToRemove.forEach(idx => {
+            currentHeaders = currentHeaders.filter((_, i) => i !== idx);
+            cleanData.forEach((row, rowIdx) => {
+                cleanData[rowIdx] = row.filter((_, i) => i !== idx);
+            });
+        });
+
+        // Step 7: Merge REL1-3 name columns (First + Middle + Last → Full Name)
+        for (let relNum = 1; relNum <= 3; relNum++) {
+            const firstIdx = currentHeaders.indexOf(`REL${relNum}: First Name`);
+            const middleIdx = currentHeaders.indexOf(`REL${relNum}: Middle Name`);
+            const lastIdx = currentHeaders.indexOf(`REL${relNum}: Last Name`);
+
+            if (firstIdx !== -1 && middleIdx !== -1 && lastIdx !== -1) {
+                // Merge into first name column
+                cleanData.forEach(row => {
+                    const first = row[firstIdx] || '';
+                    const middle = row[middleIdx] || '';
+                    const last = row[lastIdx] || '';
+                    row[firstIdx] = [first, middle, last].filter(n => n.trim()).join(' ');
+                });
+
+                // Rename first column, remove middle and last (higher index first)
+                currentHeaders[firstIdx] = `REL${relNum}: Full Name`;
+                const removeIdxs = [middleIdx, lastIdx].sort((a, b) => b - a);
+                removeIdxs.forEach(idx => {
+                    currentHeaders = currentHeaders.filter((_, i) => i !== idx);
+                    cleanData.forEach((row, rowIdx) => {
+                        cleanData[rowIdx] = row.filter((_, i) => i !== idx);
+                    });
+                });
+            }
+        }
+
         return {
             statusUpdate: { headers: ['Social', 'Status'], data: statusUpdateData },
             cleanedBatch: { headers: currentHeaders, data: cleanData },
