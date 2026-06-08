@@ -223,6 +223,8 @@ class CSVTransformer {
                 return this.transformBatch(headers, data);
             case 'batch_ems':
                 return this.transformBatchEMS(headers, data);
+            case 'batch_orn':
+                return this.transformBatchORN(headers, data);
             case 'dialer':
                 return this.transformDialer(headers, data);
             case 'import':
@@ -830,6 +832,88 @@ class CSVTransformer {
         });
 
         return { headers: emsHeaders, data: emsData };
+    }
+
+    // ── ORN BATCH ───────────────────────────────────────────────────────
+    // Transforms CRM export into ORN vendor batch format.
+    // Filters: keeps rows with 3 or fewer phone numbers (same as EMS).
+    // Scrub Date always 1/2/2013. Phone columns left empty.
+    // ────────────────────────────────────────────────────────────────────
+    transformBatchORN(headers, data) {
+        // Step 1: Count phones per row and filter — keep rows with 3 or fewer phones
+        const phoneIndices = [];
+        headers.forEach((h, i) => {
+            if (/^phone_\d+$/i.test(h)) {
+                phoneIndices.push(i);
+            }
+        });
+
+        const filteredData = data.filter(row => {
+            let phoneCount = 0;
+            for (const idx of phoneIndices) {
+                if (row[idx] && row[idx].trim() !== '') {
+                    phoneCount++;
+                    if (phoneCount > 3) return false;
+                }
+            }
+            return true;
+        });
+
+        // Step 2: Map CRM columns
+        const claimIdx = headers.findIndex(h => h.toLowerCase() === 'client_claim_number');
+        const firstNameIdx = headers.findIndex(h => h.toLowerCase() === 'debtor_first_name');
+        const lastNameIdx = headers.findIndex(h => h.toLowerCase() === 'debtor_last_name');
+        const ssnIdx = headers.findIndex(h => h.toLowerCase() === 'debtor_s_s_n');
+        const addressIdx = headers.findIndex(h => h.toLowerCase() === 'debtor_address_one');
+        const cityIdx = headers.findIndex(h => h.toLowerCase() === 'debtor_city');
+        const stateIdx = headers.findIndex(h => h.toLowerCase() === 'debtor_state');
+        const zipIdx = headers.findIndex(h => h.toLowerCase() === 'debtor_zip');
+
+        // Step 3: Build output in ORN vendor column order
+        const ornHeaders = [
+            'DEBT_ID_NO // Account #',
+            'SCRUB DATE',
+            'NAME 1',
+            'SSN',
+            'ADDRESS',
+            'CITY',
+            'STATE',
+            'ZIP',
+            'PHN1',
+            'PHN2',
+            'PHN3',
+            'PHN4',
+            'PHN5'
+        ];
+
+        const ornData = filteredData.map(row => {
+            // Account Key as plain number string
+            let accountKey = claimIdx !== -1 ? (row[claimIdx] || '') : '';
+            accountKey = accountKey.replace(/[^\d]/g, '');
+
+            // Merge first + last name
+            const firstName = firstNameIdx !== -1 ? (row[firstNameIdx] || '') : '';
+            const lastName = lastNameIdx !== -1 ? (row[lastNameIdx] || '') : '';
+            const fullName = [firstName, lastName].filter(n => n.trim()).join(' ');
+
+            return [
+                accountKey,
+                '1/2/2013',     // Fixed scrub date
+                fullName,
+                ssnIdx !== -1 ? (row[ssnIdx] || '') : '',
+                addressIdx !== -1 ? (row[addressIdx] || '') : '',
+                cityIdx !== -1 ? (row[cityIdx] || '') : '',
+                stateIdx !== -1 ? (row[stateIdx] || '') : '',
+                zipIdx !== -1 ? (row[zipIdx] || '') : '',
+                '',  // PHN1 - empty
+                '',  // PHN2 - empty
+                '',  // PHN3 - empty
+                '',  // PHN4 - empty
+                ''   // PHN5 - empty
+            ];
+        });
+
+        return { headers: ornHeaders, data: ornData };
     }
 
     transformDialer(headers, data) {
