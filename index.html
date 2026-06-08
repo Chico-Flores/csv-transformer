@@ -182,6 +182,24 @@
             color: #059669;
         }
 
+        .format-option[data-format="batch_orn"] {
+            border-color: #ddd6fe;
+        }
+
+        .format-option[data-format="batch_orn"]:hover {
+            border-color: #7c3aed;
+            box-shadow: 0 10px 25px rgba(124, 58, 237, 0.1);
+        }
+
+        .format-option[data-format="batch_orn"].selected {
+            border-color: #7c3aed;
+            background: #f5f3ff;
+        }
+
+        .format-option[data-format="batch_orn"] .icon {
+            color: #7c3aed;
+        }
+
         .file-upload {
             background: #f8fafc;
             border: 2px dashed #cbd5e1;
@@ -647,6 +665,11 @@
                         <div class="icon"><i class="fas fa-check-circle"></i></div>
                         <h3>EMS BATCH</h3>
                         <p>Format CRM export for EMS vendor - filters phones, renames columns, adds scrub date</p>
+                    </div>
+                    <div class="format-option" data-format="batch_orn">
+                        <div class="icon"><i class="fas fa-check-circle"></i></div>
+                        <h3>ORN BATCH</h3>
+                        <p>Format CRM export for ORN vendor - merges name, fixed scrub date, empty phone columns</p>
                     </div>
                     <div class="format-option" data-format="dialer">
                         <div class="icon"><i class="fas fa-check-circle"></i></div>
