@@ -238,74 +238,130 @@ class CSVTransformer {
         }
     }
 
+    // ── RETURNED BATCH ──────────────────────────────────────────────────
+    // Name-based column selection for the full vendor return CSV.
+    //
+    // This used to select columns by hard-coded spreadsheet letters
+    // (A, B, D…MR). That only worked while the vendor return had exactly the
+    // original layout: as soon as columns were added near the front, every
+    // letter pointed two columns to the right, so the transform grabbed
+    // "PH: Phone1 First Seen" instead of "PH: Phone1" and lost
+    // "DEC: Deceased (Y/N/U)" / "BNK: Bankrupt (Y/N/U)" entirely.
+    // Columns are now looked up by name, so extra/reordered columns are safe.
+    //
+    // Output order (matches the original cleaned batch):
+    //   Debtor, SSN, DOB, Phone1-5, Email1-2, Address, POE, Property,
+    //   Owner2, Prop details, Vehicle, REL1-6
+    // ────────────────────────────────────────────────────────────────────
     applyReturnedBatchTransformation() {
         const { headers, data } = this.originalData;
-        
-        // Step 1: Delete columns after REL6: Phone 2 (keep REL6: Phone 2 column)
-        const rel6Phone2Index = this.findColumnIndex(headers, 'REL6: Phone 2');
-        if (rel6Phone2Index === -1) {
-            throw new Error('Could not find REL6: Phone 2 column');
-        }
-        
-        let currentHeaders = headers.slice(0, rel6Phone2Index + 1);
-        let currentData = data.map(row => row.slice(0, rel6Phone2Index + 1));
-        
-        // Step 2: Delete unnecessary columns
-        const columnsToDelete = this.getColumnsToDelete(currentHeaders);
-        const { headers: filteredHeaders, data: filteredData } = this.deleteColumns(currentHeaders, currentData, columnsToDelete);
-        
-        // Step 2.5: Merge INPUT: First Name and INPUT: Last Name into Debtor
-        const inputFirstNameIndex = this.findColumnIndex(filteredHeaders, 'INPUT: First Name');
-        const inputLastNameIndex = this.findColumnIndex(filteredHeaders, 'INPUT: Last Name');
-        
-        let mergedHeaders = filteredHeaders;
-        let mergedData = filteredData;
-        
-        if (inputFirstNameIndex !== -1 && inputLastNameIndex !== -1) {
-            // Merge the data
-            mergedData = filteredData.map(row => {
-                const newRow = [...row];
-                const firstName = row[inputFirstNameIndex] || '';
-                const lastName = row[inputLastNameIndex] || '';
-                const fullName = [firstName, lastName].filter(n => n).join(' ');
-                newRow[inputFirstNameIndex] = fullName;
-                return newRow;
-            });
-            
-            // Update headers - rename first name to "Debtor" and remove last name column
-            mergedHeaders = filteredHeaders.map((header, index) => {
-                if (index === inputFirstNameIndex) return 'Debtor';
-                return header;
-            }).filter((_, index) => index !== inputLastNameIndex);
-            
-            // Remove last name column from data
-            mergedData = mergedData.map(row => 
-                row.filter((_, index) => index !== inputLastNameIndex)
-            );
-        }
-        
-        // Step 3: Process deceased records
-        const deceasedIndex = this.findColumnIndex(mergedHeaders, 'DEC: Deceased (Y/N/U)');
-        const ssnIndex = this.findColumnIndex(mergedHeaders, 'INPUT: SSN');
-        
-        if (deceasedIndex === -1 || ssnIndex === -1) {
-            throw new Error('Could not find required columns for deceased processing');
-        }
-        
-        const deceasedRows = mergedData.filter(row => row[deceasedIndex] === 'Y');
-        const nonDeceasedData = mergedData.filter(row => row[deceasedIndex] !== 'Y');
-        
-        // Step 4: Process bankruptcy records
-        const bankruptcyIndex = this.findColumnIndex(mergedHeaders, 'BNK: Bankrupt (Y/N/U)');
-        
-        if (bankruptcyIndex === -1) {
-            throw new Error('Could not find bankruptcy column');
-        }
-        
+
+        // Step 1: Columns to keep, in output order
+        const columnsToKeep = [
+            // Debtor identity (First + Last are merged into "Debtor")
+            'INPUT: First Name',
+            'INPUT: Last Name',
+            'INPUT: SSN',
+
+            // Date of birth
+            'DOB: Date',
+
+            // Debtor phones
+            'PH: Phone1',
+            'PH: Phone2',
+            'PH: Phone3',
+            'PH: Phone4',
+            'PH: Phone5',
+
+            // Email
+            'EMAIL: Email1',
+            'EMAIL: Email2',
+
+            // Filtering columns (removed after STATUS UPDATE extraction)
+            'DEC: Deceased (Y/N/U)',
+            'BNK: Bankrupt (Y/N/U)',
+
+            // Debtor address
+            'ADD: Address1',
+            'ADD: Address1 City',
+            'ADD: Address1 State',
+            'ADD: Address1 Zip',
+            'ADD: Address1 County',
+
+            // Employment
+            'POE: Employer Name',
+            'POE: Employer Phone',
+
+            // Property
+            'PROP: Property (Y/N/U)',
+
+            // Property Owner2 (merged into one column)
+            'PROP: Owner2 First Name',
+            'PROP: Owner2 Middle Initial',
+            'PROP: Owner2 Last Name',
+
+            // Property details
+            'PROP: Address Full',
+            'PROP: Purchase Amount',
+            'PROP: Purchase Date',
+            'PROP: Assessed Value',
+            'PROP: Market Value',
+
+            // Vehicle (merged into one column)
+            'VEHICLE: Model Year',
+            'VEHICLE: Make',
+            'VEHICLE: Model',
+
+            // Relatives 1-6
+            'REL1: Full Name', 'REL1: Address', 'REL1: City', 'REL1: State', 'REL1: Zip',
+            'REL1: Phone 1', 'REL1: Phone 2',
+
+            'REL2: Full Name', 'REL2: Address', 'REL2: City', 'REL2: State', 'REL2: Zip',
+            'REL2: Phone 1', 'REL2: Phone 2',
+
+            'REL3: Full Name', 'REL3: Address', 'REL3: City', 'REL3: State', 'REL3: Zip',
+            'REL3: Phone 1', 'REL3: Phone 2',
+
+            'REL4: Full Name', 'REL4: Address', 'REL4: City', 'REL4: State', 'REL4: Zip',
+            'REL4: Phone 1', 'REL4: Phone 2',
+
+            'REL5: Full Name', 'REL5: Address', 'REL5: City', 'REL5: State', 'REL5: Zip',
+            'REL5: Phone 1', 'REL5: Phone 2',
+
+            'REL6: Full Name', 'REL6: Address', 'REL6: City', 'REL6: State', 'REL6: Zip',
+            'REL6: Phone 1', 'REL6: Phone 2',
+        ];
+
+        // Step 2: Fail loudly (and usefully) if a column we cannot work without is gone
+        this.assertColumnsPresent(headers, [
+            'INPUT: SSN',
+            'DEC: Deceased (Y/N/U)',
+            'BNK: Bankrupt (Y/N/U)'
+        ], 'RETURNED BATCH');
+
+        // Step 3: Pull the columns we want, in the order above
+        let { headers: currentHeaders, data: currentData } =
+            this.selectColumnsByName(headers, data, columnsToKeep);
+
+        // Step 4: Merge INPUT: First Name + INPUT: Last Name → "Debtor"
+        ({ headers: currentHeaders, data: currentData } = this.mergeColumns(
+            currentHeaders, currentData,
+            'INPUT: First Name', ['INPUT: Last Name'], 'Debtor'
+        ));
+
+        // Step 5: Extract deceased records → STATUS UPDATE
+        const deceasedIndex = this.findColumnIndex(currentHeaders, 'DEC: Deceased (Y/N/U)');
+        const bankruptcyIndex = this.findColumnIndex(currentHeaders, 'BNK: Bankrupt (Y/N/U)');
+        const ssnIndex = this.findColumnIndex(currentHeaders, 'INPUT: SSN');
+
+        const deceasedRows = currentData.filter(row => row[deceasedIndex] === 'Y');
+        const nonDeceasedData = currentData.filter(row => row[deceasedIndex] !== 'Y');
+
+        // Step 6: Extract bankruptcy records → STATUS UPDATE
         const bankruptcyRows = nonDeceasedData.filter(row => row[bankruptcyIndex] === 'Y');
-        const cleanData = nonDeceasedData.filter(row => row[bankruptcyIndex] !== 'Y');
-        
-        // Create STATUS UPDATE data
+        let cleanData = nonDeceasedData.filter(row => row[bankruptcyIndex] !== 'Y');
+
+        // Build STATUS UPDATE data
         const statusUpdateData = [];
         deceasedRows.forEach(row => {
             statusUpdateData.push([row[ssnIndex], 'Deceased']);
@@ -313,81 +369,93 @@ class CSVTransformer {
         bankruptcyRows.forEach(row => {
             statusUpdateData.push([row[ssnIndex], 'Bankruptcy']);
         });
-        
-        // Remove deceased and bankruptcy columns from clean data
-        const finalHeaders = mergedHeaders.filter((_, index) => index !== deceasedIndex && index !== bankruptcyIndex);
-        const finalData = cleanData.map(row => 
-            row.filter((_, index) => index !== deceasedIndex && index !== bankruptcyIndex)
-        );
-        
-        // Step 5: Merge Owner2 name columns
-        const owner2FirstNameIndex = this.findColumnIndex(finalHeaders, 'PROP: Owner2 First Name');
-        const owner2MiddleIndex = this.findColumnIndex(finalHeaders, 'PROP: Owner2 Middle Initial');
-        const owner2LastNameIndex = this.findColumnIndex(finalHeaders, 'PROP: Owner2 Last Name');
-        
-        if (owner2FirstNameIndex !== -1 && owner2MiddleIndex !== -1 && owner2LastNameIndex !== -1) {
-            const mergedData = finalData.map(row => {
-                const newRow = [...row];
-                const firstName = row[owner2FirstNameIndex] || '';
-                const middle = row[owner2MiddleIndex] || '';
-                const lastName = row[owner2LastNameIndex] || '';
-                const fullName = [firstName, middle, lastName].filter(n => n).join(' ');
-                newRow[owner2FirstNameIndex] = fullName;
-                return newRow;
-            });
-            
-            // Remove middle and last name columns
-            const owner2Headers = finalHeaders.filter((_, index) => index !== owner2MiddleIndex && index !== owner2LastNameIndex);
-            const owner2Data = mergedData.map(row => 
-                row.filter((_, index) => index !== owner2MiddleIndex && index !== owner2LastNameIndex)
-            );
-            
-            // Step 6: Merge vehicle columns
-            const vehicleYearIndex = this.findColumnIndex(owner2Headers, 'VEHICLE: Model Year');
-            const vehicleMakeIndex = this.findColumnIndex(owner2Headers, 'VEHICLE: Make');
-            const vehicleModelIndex = this.findColumnIndex(owner2Headers, 'VEHICLE: Model');
-            
-            if (vehicleYearIndex !== -1 && vehicleMakeIndex !== -1 && vehicleModelIndex !== -1) {
-                const vehicleData = owner2Data.map(row => {
-                    const newRow = [...row];
-                    const year = row[vehicleYearIndex] || '';
-                    const make = row[vehicleMakeIndex] || '';
-                    const model = row[vehicleModelIndex] || '';
-                    const vehicleInfo = [year, make, model].filter(v => v).join(' ');
-                    newRow[vehicleYearIndex] = vehicleInfo;
-                    return newRow;
-                });
-                
-                // Remove make and model columns
-                const finalCleanedHeaders = owner2Headers.filter((_, index) => index !== vehicleMakeIndex && index !== vehicleModelIndex);
-                const finalCleanedData = vehicleData.map(row => 
-                    row.filter((_, index) => index !== vehicleMakeIndex && index !== vehicleModelIndex)
-                );
-                
-                return {
-                    statusUpdate: { headers: ['Social', 'Status'], data: statusUpdateData },
-                    cleanedBatch: { headers: finalCleanedHeaders, data: finalCleanedData },
-                    statistics: {
-                        totalOriginal: data.length,
-                        deceased: deceasedRows.length,
-                        bankruptcy: bankruptcyRows.length,
-                        totalStatus: statusUpdateData.length,
-                        remaining: finalCleanedData.length
-                    }
-                };
-            }
-        }
-        
+
+        // Step 7: Drop the deceased/bankruptcy flag columns from the clean batch
+        const flagIndices = [deceasedIndex, bankruptcyIndex];
+        currentHeaders = currentHeaders.filter((_, index) => !flagIndices.includes(index));
+        cleanData = cleanData.map(row => row.filter((_, index) => !flagIndices.includes(index)));
+
+        // Step 8: Merge PROP: Owner2 columns into one
+        ({ headers: currentHeaders, data: cleanData } = this.mergeColumns(
+            currentHeaders, cleanData,
+            'PROP: Owner2 First Name', ['PROP: Owner2 Middle Initial', 'PROP: Owner2 Last Name']
+        ));
+
+        // Step 9: Merge VEHICLE columns into one
+        ({ headers: currentHeaders, data: cleanData } = this.mergeColumns(
+            currentHeaders, cleanData,
+            'VEHICLE: Model Year', ['VEHICLE: Make', 'VEHICLE: Model']
+        ));
+
         return {
             statusUpdate: { headers: ['Social', 'Status'], data: statusUpdateData },
-            cleanedBatch: { headers: finalHeaders, data: finalData },
+            cleanedBatch: { headers: currentHeaders, data: cleanData },
             statistics: {
                 totalOriginal: data.length,
                 deceased: deceasedRows.length,
                 bankruptcy: bankruptcyRows.length,
                 totalStatus: statusUpdateData.length,
-                remaining: finalData.length
+                remaining: cleanData.length
             }
+        };
+    }
+
+    // Throws with the exact missing header names instead of a vague message.
+    assertColumnsPresent(headers, requiredNames, label) {
+        const missing = requiredNames.filter(name => this.findColumnIndex(headers, name) === -1);
+        if (missing.length > 0) {
+            throw new Error(
+                `${label}: could not find required column(s): ${missing.join(', ')}. ` +
+                `Check that the vendor file headers still match.`
+            );
+        }
+    }
+
+    // Keeps only the named columns, in the order given. Missing names are skipped.
+    selectColumnsByName(headers, data, columnNames) {
+        const keepIndices = [];
+        const keepHeaders = [];
+
+        columnNames.forEach(name => {
+            const index = this.findColumnIndex(headers, name);
+            if (index !== -1) {
+                keepIndices.push(index);
+                keepHeaders.push(headers[index]);
+            }
+        });
+
+        return {
+            headers: keepHeaders,
+            data: data.map(row => keepIndices.map(index => row[index] || ''))
+        };
+    }
+
+    // Joins sourceNames into targetName (space separated, blanks skipped),
+    // removes the source columns and optionally renames the target column.
+    mergeColumns(headers, data, targetName, sourceNames, newName = null) {
+        const targetIndex = this.findColumnIndex(headers, targetName);
+        const sourceIndices = sourceNames
+            .map(name => this.findColumnIndex(headers, name))
+            .filter(index => index !== -1);
+
+        if (targetIndex === -1) {
+            return { headers, data };
+        }
+
+        const mergedData = data.map(row => {
+            const newRow = [...row];
+            const parts = [row[targetIndex], ...sourceIndices.map(index => row[index])];
+            newRow[targetIndex] = parts.filter(part => part).join(' ');
+            return newRow;
+        });
+
+        const newHeaders = headers
+            .map((header, index) => (index === targetIndex && newName ? newName : header))
+            .filter((_, index) => !sourceIndices.includes(index));
+
+        return {
+            headers: newHeaders,
+            data: mergedData.map(row => row.filter((_, index) => !sourceIndices.includes(index)))
         };
     }
 
@@ -759,95 +827,6 @@ class CSVTransformer {
         };
     }
 
-    getColumnsToDelete(headers) {
-        const columnsToDelete = [];
-        
-        // Single columns to delete (removed A and B - we'll merge them later)
-        const singleColumns = ['D', 'E', 'F', 'G', 'H', 'J', 'L', 'M', 'N', 'P', 'Q', 'R', 'T', 'U', 'V', 'X', 'Y', 'AA', 'AB', 'AD', 'AE'];
-        
-        // Columns to keep (relative information)
-        const columnsToKeep = [
-            { start: 'JC', end: 'JG' },  // Rel 1: Full Name through Zip
-            { start: 'JI', end: 'JJ' },  // Rel 1: Phone 1 & Phone 2 (skip age at JH)
-            { start: 'JT', end: 'JX' },  // Rel 2: Full Name through Zip
-            { start: 'JZ', end: 'KA' },  // Rel 2: Phone 1 & Phone 2 (skip age at JY)
-            { start: 'KK', end: 'KO' },  // Rel 3: Full Name through Zip
-            { start: 'KQ', end: 'KR' },  // Rel 3: Phone 1 & Phone 2 (skip age at KP)
-            { start: 'LB', end: 'LF' },  // Rel 4: Full Name through Zip
-            { start: 'LH', end: 'LI' },  // Rel 4: Phone 1 & Phone 2 (skip age at LG)
-            { start: 'LS', end: 'LW' },  // Rel 5: Full Name through Zip
-            { start: 'LY', end: 'LZ' },  // Rel 5: Phone 1 & Phone 2 (skip age at LX)
-            { start: 'MJ', end: 'MN' },  // Rel 6: Full Name through Zip (skip First/Middle/Last/Suffix at MF-MI)
-            { start: 'MP', end: 'MQ' }   // Rel 6: Phone 1 & Phone 2 (skip age at MO)
-        ];
-        
-        // Range columns to delete (modified to exclude relative columns)
-        const rangeColumns = [
-            { start: 'AG', end: 'AQ' },
-            { start: 'AS', end: 'BH' },
-            { start: 'BJ', end: 'EG' },
-            { start: 'EM', end: 'EQ' },
-            { start: 'ET', end: 'EX' },
-            { start: 'EZ', end: 'FC' },
-            { start: 'FG', end: 'FJ' },
-            { start: 'FL', end: 'GQ' },
-            { start: 'GT', end: 'GV' },
-            { start: 'GY', end: 'HA' },
-            { start: 'HE', end: 'JB' },  // Split: stops before JC (Rel 1 Full Name)
-            // JC-JG are kept (Rel 1: Full Name through Zip)
-            { start: 'JH', end: 'JH' },  // Delete JH (Rel 1 Age)
-            // JI-JJ are kept (Rel 1: Phone 1 & Phone 2)
-            { start: 'JK', end: 'JS' },  // Delete Phone 3+, stops before JT
-            // JT-JX are kept (Rel 2: Full Name through Zip)
-            { start: 'JY', end: 'JY' },  // Delete JY (Rel 2 Age)
-            // JZ-KA are kept (Rel 2: Phone 1 & Phone 2)
-            { start: 'KB', end: 'KJ' },  // Delete Phone 3+, stops before KK
-            // KK-KO are kept (Rel 3: Full Name through Zip)
-            { start: 'KP', end: 'KP' },  // Delete KP (Rel 3 Age)
-            // KQ-KR are kept (Rel 3: Phone 1 & Phone 2)
-            { start: 'KS', end: 'LA' },  // Delete Phone 3+, stops before LB
-            // LB-LF are kept (Rel 4: Full Name through Zip)
-            { start: 'LG', end: 'LG' },  // Delete LG (Rel 4 Age)
-            // LH-LI are kept (Rel 4: Phone 1 & Phone 2)
-            { start: 'LJ', end: 'LR' },  // Delete Phone 3+, stops before LS
-            // LS-LW are kept (Rel 5: Full Name through Zip)
-            { start: 'LX', end: 'LX' },  // Delete LX (Rel 5 Age)
-            // LY-LZ are kept (Rel 5: Phone 1 & Phone 2)
-            { start: 'MA', end: 'MI' },  // Delete Phone 3+ and Rel6 individual name columns (First/Middle/Last/Suffix)
-            // MJ-MN are kept (Rel 6: Full Name through Zip)
-            { start: 'MO', end: 'MO' },  // Delete MO (Rel 6 Age)
-            // MP-MQ are kept (Rel 6: Phone 1 & Phone 2)
-            { start: 'MR', end: 'MR' }   // Delete MR and beyond (Rel 6: Phone 3+)
-        ];
-        
-        // Convert column letters to indices
-        singleColumns.forEach(col => {
-            const index = this.columnLetterToIndex(col);
-            if (index < headers.length) {
-                columnsToDelete.push(index);
-            }
-        });
-        
-        rangeColumns.forEach(range => {
-            const startIndex = this.columnLetterToIndex(range.start);
-            const endIndex = this.columnLetterToIndex(range.end);
-            for (let i = startIndex; i <= endIndex && i < headers.length; i++) {
-                columnsToDelete.push(i);
-            }
-        });
-        
-        return [...new Set(columnsToDelete)].sort((a, b) => b - a); // Sort descending to delete from end
-    }
-
-    columnLetterToIndex(column) {
-        let result = 0;
-        for (let i = 0; i < column.length; i++) {
-            result *= 26;
-            result += column.charCodeAt(i) - 'A'.charCodeAt(0) + 1;
-        }
-        return result - 1; // Convert to 0-based index
-    }
-
     deleteColumns(headers, data, columnIndices) {
         const newHeaders = headers.filter((_, index) => !columnIndices.includes(index));
         const newData = data.map(row => row.filter((_, index) => !columnIndices.includes(index)));
@@ -855,7 +834,18 @@ class CSVTransformer {
     }
 
     findColumnIndex(headers, headerName) {
-        return headers.findIndex(header => header === headerName);
+        // Exact match first, then a whitespace/case-insensitive match so small
+        // header tweaks ("PH: Phone 1" vs "PH: Phone1", stray spaces, casing)
+        // do not silently drop a column.
+        const exact = headers.findIndex(header => header === headerName);
+        if (exact !== -1) return exact;
+
+        const normalize = value => String(value == null ? '' : value)
+            .replace(/^\uFEFF/, '')
+            .replace(/\s+/g, '')
+            .toLowerCase();
+        const target = normalize(headerName);
+        return headers.findIndex(header => normalize(header) === target);
     }
 
     transformBatch(headers, data) {
