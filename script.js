@@ -314,22 +314,22 @@ class CSVTransformer {
 
             // Relatives 1-6
             'REL1: Full Name', 'REL1: Address', 'REL1: City', 'REL1: State', 'REL1: Zip',
-            'REL1: Phone 1', 'REL1: Phone 2',
+            'REL1: Phone 1', 'REL1: Phone 2', 'REL1: Likely Relationship',
 
             'REL2: Full Name', 'REL2: Address', 'REL2: City', 'REL2: State', 'REL2: Zip',
-            'REL2: Phone 1', 'REL2: Phone 2',
+            'REL2: Phone 1', 'REL2: Phone 2', 'REL2: Likely Relationship',
 
             'REL3: Full Name', 'REL3: Address', 'REL3: City', 'REL3: State', 'REL3: Zip',
-            'REL3: Phone 1', 'REL3: Phone 2',
+            'REL3: Phone 1', 'REL3: Phone 2', 'REL3: Likely Relationship',
 
             'REL4: Full Name', 'REL4: Address', 'REL4: City', 'REL4: State', 'REL4: Zip',
-            'REL4: Phone 1', 'REL4: Phone 2',
+            'REL4: Phone 1', 'REL4: Phone 2', 'REL4: Likely Relationship',
 
             'REL5: Full Name', 'REL5: Address', 'REL5: City', 'REL5: State', 'REL5: Zip',
-            'REL5: Phone 1', 'REL5: Phone 2',
+            'REL5: Phone 1', 'REL5: Phone 2', 'REL5: Likely Relationship',
 
             'REL6: Full Name', 'REL6: Address', 'REL6: City', 'REL6: State', 'REL6: Zip',
-            'REL6: Phone 1', 'REL6: Phone 2',
+            'REL6: Phone 1', 'REL6: Phone 2', 'REL6: Likely Relationship',
         ];
 
         // Step 2: Fail loudly (and usefully) if a column we cannot work without is gone
@@ -1444,7 +1444,8 @@ class CSVTransformer {
                 state: 'REL1: State',
                 zip: 'REL1: Zip',
                 phone1: 'REL1: Phone 1',
-                phone2: 'REL1: Phone 2'
+                phone2: 'REL1: Phone 2',
+                relationship: 'REL1: Likely Relationship'
             },
             {
                 name: 'REL2: Full Name',
@@ -1453,7 +1454,8 @@ class CSVTransformer {
                 state: 'REL2: State',
                 zip: 'REL2: Zip',
                 phone1: 'REL2: Phone 1',
-                phone2: 'REL2: Phone 2'
+                phone2: 'REL2: Phone 2',
+                relationship: 'REL2: Likely Relationship'
             },
             {
                 name: 'REL3: Full Name',
@@ -1462,7 +1464,8 @@ class CSVTransformer {
                 state: 'REL3: State',
                 zip: 'REL3: Zip',
                 phone1: 'REL3: Phone 1',
-                phone2: 'REL3: Phone 2'
+                phone2: 'REL3: Phone 2',
+                relationship: 'REL3: Likely Relationship'
             },
             {
                 name: 'REL4: Full Name',
@@ -1471,7 +1474,8 @@ class CSVTransformer {
                 state: 'REL4: State',
                 zip: 'REL4: Zip',
                 phone1: 'REL4: Phone 1',
-                phone2: 'REL4: Phone 2'
+                phone2: 'REL4: Phone 2',
+                relationship: 'REL4: Likely Relationship'
             },
             {
                 name: 'REL5: Full Name',
@@ -1480,7 +1484,8 @@ class CSVTransformer {
                 state: 'REL5: State',
                 zip: 'REL5: Zip',
                 phone1: 'REL5: Phone 1',
-                phone2: 'REL5: Phone 2'
+                phone2: 'REL5: Phone 2',
+                relationship: 'REL5: Likely Relationship'
             },
             {
                 name: 'REL6: Full Name',
@@ -1489,7 +1494,8 @@ class CSVTransformer {
                 state: 'REL6: State',
                 zip: 'REL6: Zip',
                 phone1: 'REL6: Phone 1',
-                phone2: 'REL6: Phone 2'
+                phone2: 'REL6: Phone 2',
+                relationship: 'REL6: Likely Relationship'
             }
         ];
 
@@ -1559,6 +1565,11 @@ class CSVTransformer {
                 const relativeName = nameIdx !== -1 ? row[nameIdx] : '';
 
                 if (relativeName && relativeName.trim()) {
+                    const relationshipIdx = this.findColumnIndex(headers, rel.relationship);
+                    const relationship = relationshipIdx !== -1
+                        ? (row[relationshipIdx] || '').trim().toUpperCase()
+                        : '';
+
                     const relativePerson = {
                         name: relativeName,
                         type: 'RELATIVE',
@@ -1568,6 +1579,12 @@ class CSVTransformer {
                         zip: zipIdx !== -1 ? row[zipIdx] || '' : '',
                         county: null
                     };
+
+                    // Only present when the vendor supplied one, so debtor and
+                    // POE entries stay exactly as they are today.
+                    if (relationship) {
+                        relativePerson.relationship = relationship;
+                    }
 
                     // Process relative phones (2 phones)
                     [phone1Idx, phone2Idx].forEach(idx => {
@@ -1657,6 +1674,7 @@ class CSVTransformer {
         const stateIdx = headers.findIndex(h => h.toLowerCase() === 'state');
         const zipIdx = headers.findIndex(h => h.toLowerCase() === 'zip');
         const countyIdx = headers.findIndex(h => h.toLowerCase() === 'county');
+        const relationshipIdx = headers.findIndex(h => h.toLowerCase() === 'relationship');
         // Note: "Error Reason" column is intentionally ignored
         
         data.forEach(row => {
@@ -1673,6 +1691,13 @@ class CSVTransformer {
                     zip: zipIdx !== -1 ? row[zipIdx] || '' : '',
                     county: countyIdx !== -1 ? row[countyIdx] || '' : null
                 };
+
+                const relationship = relationshipIdx !== -1
+                    ? (row[relationshipIdx] || '').trim().toUpperCase()
+                    : '';
+                if (relationship) {
+                    person.relationship = relationship;
+                }
                 
                 phoneRecords.push({
                     phone: cleanedPhone,
