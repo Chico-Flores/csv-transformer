@@ -1588,6 +1588,53 @@ class CSVTransformer {
         return phoneRecords;
     }
 
+    // Splits phone records into upload batches WITHOUT ever putting the same
+    // phone number in two different batches.
+    //
+    // Batches are posted five at a time. Slicing the list blindly used to drop
+    // one phone into two of those concurrent requests; both would find the
+    // number missing and both would insert it, and the loser came back as
+    // "E11000 duplicate key error ... index: _id_". That failed the whole
+    // 2000-record batch even though most of its records had already been
+    // written, which is why a re-upload then reported everything as already
+    // in the database.
+    //
+    // Keeping every record for a phone in one batch removes the race. Exact
+    // duplicate records (same phone and same person) are dropped too.
+    buildPhoneBatches(phoneRecords, batchSize) {
+        const byPhone = new Map();
+        const seen = new Set();
+
+        phoneRecords.forEach(record => {
+            const fingerprint = JSON.stringify(record);
+            if (seen.has(fingerprint)) return;
+            seen.add(fingerprint);
+
+            if (!byPhone.has(record.phone)) {
+                byPhone.set(record.phone, []);
+            }
+            byPhone.get(record.phone).push(record);
+        });
+
+        const batches = [];
+        let current = [];
+
+        byPhone.forEach(group => {
+            // Start a new batch rather than split this phone across two.
+            if (current.length > 0 && current.length + group.length > batchSize) {
+                batches.push(current);
+                current = [];
+            }
+            group.forEach(record => current.push(record));
+        });
+
+        if (current.length > 0) {
+            batches.push(current);
+        }
+
+        return batches;
+    }
+
     isFlattenedPhoneFormat(headers) {
         // Check if this CSV has the flattened format columns (from error CSV export)
         // Flattened format has: Phone, Name, Type, Address, City, State, Zip, County, (Error Reason)
@@ -1664,11 +1711,9 @@ class CSVTransformer {
             let totalErrors = 0;
             let totalInDatabase = 0;
 
-            // Create all batches upfront
-            const batches = [];
-            for (let i = 0; i < phoneRecords.length; i += BATCH_SIZE) {
-                batches.push(phoneRecords.slice(i, i + BATCH_SIZE));
-            }
+            // Create all batches upfront, grouped so one phone number never
+            // lands in two batches (see buildPhoneBatches).
+            const batches = this.buildPhoneBatches(phoneRecords, BATCH_SIZE);
             const totalBatches = batches.length;
 
             // Process batches in parallel groups
