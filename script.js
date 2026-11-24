@@ -1384,7 +1384,30 @@ class CSVTransformer {
         // Take last 10 digits
         const cleanedPhone = digits.slice(-10);
         // Return null if not exactly 10 digits
-        return cleanedPhone.length === 10 ? cleanedPhone : null;
+        if (cleanedPhone.length !== 10) return null;
+        // Reject vendor filler so it does not collect unrelated people
+        return this.isPlaceholderPhone(cleanedPhone) ? null : cleanedPhone;
+    }
+
+    // Vendors use filler numbers where they have nothing: 9999999999 had
+    // accumulated 71 unrelated people in the phone database before this.
+    // Only structurally impossible or obviously fake numbers are rejected --
+    // real switchboards like 5107550000 must still get through.
+    isPlaceholderPhone(digits) {
+        // Every digit the same: 0000000000, 5555555555, 9999999999
+        if (/^(\d)\1{9}$/.test(digits)) return true;
+
+        // A straight run up or down: 1234567890, 9876543210
+        const ascending = '01234567890123456789';
+        const descending = '98765432109876543210';
+        if (ascending.includes(digits) || descending.includes(digits)) return true;
+
+        // No North American area code or exchange starts with 0 or 1, so these
+        // cannot be dialled and are always junk.
+        if (/^[01]/.test(digits)) return true;
+        if (/^\d{3}[01]/.test(digits)) return true;
+
+        return false;
     }
 
     transformToPhoneRecords() {
