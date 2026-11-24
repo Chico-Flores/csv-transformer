@@ -364,16 +364,25 @@ class CSVTransformer {
         // Build STATUS UPDATE data
         const statusUpdateData = [];
         deceasedRows.forEach(row => {
-            statusUpdateData.push([row[ssnIndex], 'Deceased']);
+            statusUpdateData.push([this.normalizeSSN(row[ssnIndex]), 'Deceased']);
         });
         bankruptcyRows.forEach(row => {
-            statusUpdateData.push([row[ssnIndex], 'Bankruptcy']);
+            statusUpdateData.push([this.normalizeSSN(row[ssnIndex]), 'Bankruptcy']);
         });
 
         // Step 7: Drop the deceased/bankruptcy flag columns from the clean batch
         const flagIndices = [deceasedIndex, bankruptcyIndex];
         currentHeaders = currentHeaders.filter((_, index) => !flagIndices.includes(index));
         cleanData = cleanData.map(row => row.filter((_, index) => !flagIndices.includes(index)));
+
+        // Step 7b: Restore SSN leading zeros in the clean batch too, so it
+        // matches the Socials written to STATUS UPDATE.
+        const cleanSsnIndex = this.findColumnIndex(currentHeaders, 'INPUT: SSN');
+        if (cleanSsnIndex !== -1) {
+            cleanData.forEach(row => {
+                row[cleanSsnIndex] = this.normalizeSSN(row[cleanSsnIndex]);
+            });
+        }
 
         // Step 8: Merge PROP: Owner2 columns into one
         ({ headers: currentHeaders, data: cleanData } = this.mergeColumns(
@@ -1341,6 +1350,31 @@ class CSVTransformer {
             return `${digits.slice(0, 3)}-${digits.slice(3, 5)}-${digits.slice(5)}`;
         }
         return ssn;
+    }
+
+    // The vendor hands back INPUT: SSN as a number, so leading zeros are lost
+    // and 47821979 is really 047821979. A Social under 9 digits will not match
+    // in the CRM, so the status update for that debtor quietly does nothing.
+    //
+    // Confirmed against the bankruptcy database's own SSN in the same row:
+    // 13 of the 15 short values matched exactly once padded, and all 192 short
+    // values in that file padded to a valid area number.
+    //
+    // Padding only happens when the result is structurally valid (area 001-899,
+    // never 666). A stray "0" or a 5-digit fragment is left as it is, so it
+    // stays visibly broken instead of becoming a plausible wrong number.
+    normalizeSSN(ssn) {
+        const digits = String(ssn === null || ssn === undefined ? '' : ssn).replace(/\D/g, '');
+
+        if (!digits) return '';
+        if (digits.length === 9) return digits;
+        if (digits.length > 9) return digits;
+
+        const padded = digits.padStart(9, '0');
+        const area = parseInt(padded.slice(0, 3), 10);
+        const validArea = area >= 1 && area <= 899 && area !== 666;
+
+        return validArea ? padded : digits;
     }
 
     standardizeCity(city) {
